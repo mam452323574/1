@@ -1,0 +1,206 @@
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/services/supabase';
+import { UserProfile, OAuthProvider } from '@/types';
+
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  userProfile: UserProfile | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, username: string, avatarUrl?: string) => Promise<void>;
+  signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
+  signOut: () => Promise<void>;
+  checkUsernameAvailability: (username: string) => Promise<boolean>;
+  updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
+  isDisposableEmail: (email: string) => Promise<boolean>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await loadUserProfile(session.user.id);
+      }
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      (async () => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await loadUserProfile(session.user.id);
+        } else {
+          setUserProfile(null);
+        }
+      })();
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+  };
+
+  const signUp = async (email: string, password: string, username: string, avatarUrl?: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: data.user.id,
+          email: data.user.email!,
+          username,
+          avatar_url: avatarUrl || null,
+          account_tier: 'free',
+        });
+
+      if (profileError) throw profileError;
+
+      await supabase.from('oauth_connections').insert({
+        user_id: data.user.id,
+        provider: 'email',
+        provider_user_id: data.user.id,
+        provider_email: email,
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      await supabase.from('health_scores').insert({
+        user_id: data.user.id,
+        score: 50,
+        calories_current: 0,
+        calories_goal: 2000,
+        bodyfat: 20,
+        muscle: 40,
+        date: today,
+      });
+    }
+  };
+
+  const signInWithOAuth = async (provider: 'google' | 'apple') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+
+    if (error) throw error;
+  };
+
+  const checkUsernameAvailability = async (username: string): Promise<boolean> => {
+    if (!username || username.length < 3) return false;
+
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('username')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (error) throw error;
+    return !data;
+  };
+
+  const updateUserProfile = async (updates: Partial<UserProfile>) => {
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .update(updates)
+      .eq('id', user.id);
+
+    if (error) throw error;
+
+    await loadUserProfile(user.id);
+  };
+
+  const refreshUserProfile = async () => {
+    if (!user) throw new Error('User not authenticated');
+    await loadUserProfile(user.id);
+  };
+
+  const isDisposableEmail = async (email: string): Promise<boolean> => {
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain) return false;
+
+    const { data } = await supabase
+      .from('disposable_email_domains')
+      .select('domain')
+      .eq('domain', domain)
+      .eq('active', true)
+      .maybeSingle();
+
+    return !!data;
+  };
+
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      session,
+      userProfile,
+      loading,
+      signIn,
+      signUp,
+      signInWithOAuth,
+      signOut,
+      checkUsernameAvailability,
+      updateUserProfile,
+      refreshUserProfile,
+      isDisposableEmail,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
