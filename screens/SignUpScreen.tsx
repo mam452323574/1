@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Heart, Check, X, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,7 @@ export default function SignUpScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'error'>('idle');
   const [checkTimeout, setCheckTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -44,13 +44,15 @@ export default function SignUpScreen() {
 
     const timeout = setTimeout(async () => {
       try {
+        console.log('[Username Check] Starting validation for:', username);
         const isAvailable = await checkUsernameAvailability(username);
+        console.log('[Username Check] Result:', isAvailable ? 'available' : 'taken');
         setUsernameStatus(isAvailable ? 'available' : 'taken');
       } catch (error) {
-        console.error('Error checking username:', error);
-        setUsernameStatus('idle');
+        console.error('[Username Check] Error:', error);
+        setUsernameStatus('error');
       }
-    }, 300);
+    }, 500);
 
     setCheckTimeout(timeout);
 
@@ -65,8 +67,45 @@ export default function SignUpScreen() {
   };
 
   const handleSignUp = async () => {
+    setError(null);
+
     if (!email || !password || !confirmPassword || !username) {
       setError('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      setError('Le nom d\'utilisateur doit contenir entre 3 et 20 caractères');
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      setError('Le nom d\'utilisateur ne peut contenir que des lettres, chiffres, _ ou -');
+      return;
+    }
+
+    if (usernameStatus === 'checking') {
+      setError('Vérification du nom d\'utilisateur en cours, veuillez patienter');
+      return;
+    }
+
+    if (usernameStatus === 'error') {
+      try {
+        const isAvailable = await checkUsernameAvailability(username);
+        if (!isAvailable) {
+          setError('Ce nom d\'utilisateur est déjà pris');
+          setUsernameStatus('taken');
+          return;
+        }
+        setUsernameStatus('available');
+      } catch (err) {
+        setError('Impossible de vérifier la disponibilité du nom d\'utilisateur');
+        return;
+      }
+    }
+
+    if (usernameStatus === 'taken') {
+      setError('Ce nom d\'utilisateur est déjà pris, veuillez en choisir un autre');
       return;
     }
 
@@ -106,13 +145,15 @@ export default function SignUpScreen() {
   const getUsernameStatusIcon = () => {
     switch (usernameStatus) {
       case 'checking':
-        return null;
+        return <ActivityIndicator size="small" color={COLORS.primary} />;
       case 'available':
         return <Check color={COLORS.success} size={20} />;
       case 'taken':
         return <X color={COLORS.error} size={20} />;
       case 'invalid':
         return <AlertCircle color={COLORS.error} size={20} />;
+      case 'error':
+        return <AlertCircle color={COLORS.warning} size={20} />;
       default:
         return null;
     }
@@ -121,25 +162,31 @@ export default function SignUpScreen() {
   const getUsernameStatusText = () => {
     switch (usernameStatus) {
       case 'checking':
-        return 'Vérification...';
+        return 'Vérification de la disponibilité...';
       case 'available':
-        return 'Disponible';
+        return 'Disponible !';
       case 'taken':
-        return 'Déjà pris';
+        return 'Déjà pris, essayez un autre';
       case 'invalid':
-        return '3-20 caractères, lettres, chiffres, _ ou -';
+        return '3-20 caractères : lettres, chiffres, _ ou -';
+      case 'error':
+        return 'Erreur de vérification (vous pouvez quand même continuer)';
       default:
-        return '';
+        return '3-20 caractères : lettres, chiffres, _ ou -';
     }
   };
 
   const getUsernameStatusColor = () => {
     switch (usernameStatus) {
+      case 'checking':
+        return COLORS.primary;
       case 'available':
         return COLORS.success;
       case 'taken':
       case 'invalid':
         return COLORS.error;
+      case 'error':
+        return COLORS.warning;
       default:
         return COLORS.gray;
     }
@@ -185,11 +232,9 @@ export default function SignUpScreen() {
                   {getUsernameStatusIcon()}
                 </View>
               </View>
-              {usernameStatus !== 'idle' && (
-                <Text style={[styles.statusText, { color: getUsernameStatusColor() }]}>
-                  {getUsernameStatusText()}
-                </Text>
-              )}
+              <Text style={[styles.statusText, { color: getUsernameStatusColor() }]}>
+                {getUsernameStatusText()}
+              </Text>
             </View>
 
             <View style={styles.inputContainer}>
@@ -242,7 +287,7 @@ export default function SignUpScreen() {
               title="S'inscrire"
               onPress={handleSignUp}
               loading={loading}
-              disabled={usernameStatus !== 'available'}
+              disabled={loading || !email || !password || !confirmPassword || !username || username.length < 3}
             />
 
             <TouchableOpacity

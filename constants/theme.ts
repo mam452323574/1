@@ -12,6 +12,7 @@ export const COLORS = {
   white: '#FFFFFF',
   error: '#FF3B30',
   success: '#34C759',
+  warning: '#FF9500',
 };
 
 export const FONTS = {
