@@ -15,6 +15,10 @@ export default function SettingsScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
+    console.log('[Settings] handleSignOut called - button was clicked!');
+    console.log('[Settings] signOut function exists:', !!signOut);
+    console.log('[Settings] userProfile exists:', !!userProfile);
+
     Alert.alert(
       'Déconnexion',
       'Êtes-vous sûr de vouloir vous déconnecter ?',
@@ -138,18 +142,23 @@ export default function SettingsScreen() {
       <View style={styles.dangerZone}>
         <TouchableOpacity
           style={styles.signOutButton}
-          onPress={handleSignOut}
+          onPress={() => {
+            console.log('[Settings] TouchableOpacity onPress triggered!');
+            handleSignOut();
+          }}
           activeOpacity={0.8}
           disabled={isSigningOut}
         >
-          {isSigningOut ? (
-            <ActivityIndicator color={COLORS.error} size="small" />
-          ) : (
-            <LogOut color={COLORS.error} size={20} />
-          )}
-          <Text style={styles.signOutText}>
-            {isSigningOut ? 'Déconnexion...' : 'Se Déconnecter'}
-          </Text>
+          <View style={styles.signOutButtonContent}>
+            {isSigningOut ? (
+              <ActivityIndicator color={COLORS.error} size="small" />
+            ) : (
+              <LogOut color={COLORS.error} size={20} />
+            )}
+            <Text style={styles.signOutText}>
+              {isSigningOut ? 'Déconnexion...' : 'Se Déconnecter'}
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -286,20 +295,24 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.error,
+    zIndex: 10,
+    elevation: 5,
+  },
+  signOutButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   signOutText: {
     fontSize: SIZES.text16,
     fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.error,
+    marginLeft: SPACING.sm,
   },
   footer: {
     alignItems: 'center',
