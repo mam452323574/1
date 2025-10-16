@@ -165,7 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (result.type === 'success' && result.url) {
           console.log('[OAuth] Success! Processing callback URL...');
-          const { params } = Linking.parse(result.url);
+          const parsed = Linking.parse(result.url);
+          const params = parsed.queryParams;
 
           if (params?.access_token && params?.refresh_token) {
             const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
@@ -296,14 +297,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
     if (!user) throw new Error('User not authenticated');
 
-    const { error } = await supabase
-      .from('user_profiles')
-      .update(updates)
-      .eq('id', user.id);
+    console.log('[ProfileUpdate] Starting profile update for user:', user.id);
+    console.log('[ProfileUpdate] Updates:', JSON.stringify(updates));
 
-    if (error) throw error;
+    try {
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
 
-    await loadUserProfile(user.id);
+      if (checkError) {
+        console.error('[ProfileUpdate] Error checking profile existence:', checkError);
+        throw checkError;
+      }
+
+      if (existingProfile) {
+        console.log('[ProfileUpdate] Profile exists, performing UPDATE');
+        const { error: updateError } = await supabase
+          .from('user_profiles')
+          .update(updates)
+          .eq('id', user.id);
+
+        if (updateError) {
+          console.error('[ProfileUpdate] UPDATE failed:', updateError);
+          throw updateError;
+        }
+        console.log('[ProfileUpdate] UPDATE successful');
+      } else {
+        console.log('[ProfileUpdate] Profile does not exist, performing INSERT');
+        const profileData = {
+          id: user.id,
+          email: user.email || `${user.id}@oauth.temp`,
+          account_tier: 'free',
+          ...updates,
+        };
+
+        const { error: insertError } = await supabase
+          .from('user_profiles')
+          .insert(profileData);
+
+        if (insertError) {
+          console.error('[ProfileUpdate] INSERT failed:', insertError);
+          throw insertError;
+        }
+        console.log('[ProfileUpdate] INSERT successful');
+      }
+
+      await loadUserProfile(user.id);
+      console.log('[ProfileUpdate] Profile reloaded successfully');
+    } catch (error) {
+      console.error('[ProfileUpdate] Critical error in updateUserProfile:', error);
+      throw error;
+    }
   };
 
   const refreshUserProfile = async () => {

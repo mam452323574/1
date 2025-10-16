@@ -1,15 +1,21 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { BadgeProvider } from '@/contexts/BadgeContext';
+import { Button } from '@/components/Button';
+import { COLORS, SPACING, SIZES } from '@/constants/theme';
 
 function RootLayoutNav() {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [redirectCount, setRedirectCount] = useState(0);
+  const [loopDetected, setLoopDetected] = useState(false);
+  const lastRedirectTime = useRef<number>(0);
 
   useEffect(() => {
     if (loading) return;
@@ -19,17 +25,66 @@ function RootLayoutNav() {
     const inPremiumUpgrade = segments[0] === 'premium-upgrade';
     const inLogin = segments[0] === 'login' || segments[0] === 'signup';
 
+    const now = Date.now();
+    const timeSinceLastRedirect = now - lastRedirectTime.current;
+
+    if (timeSinceLastRedirect < 1000 && !inAuthGroup) {
+      console.warn('[Navigation] Rapid redirect detected, incrementing counter');
+      setRedirectCount(prev => prev + 1);
+    } else {
+      if (inAuthGroup && redirectCount > 0) {
+        console.log('[Navigation] User reached stable state, resetting counter');
+        setRedirectCount(0);
+        setLoopDetected(false);
+      }
+    }
+
+    if (redirectCount >= 5) {
+      console.error('[Navigation] LOOP DETECTED - Too many redirects!');
+      setLoopDetected(true);
+      Alert.alert(
+        'Erreur de Navigation',
+        'Une boucle de redirection a été détectée. Cela peut indiquer un problème avec la configuration de votre profil. Veuillez vous déconnecter et réessayer.',
+        [
+          {
+            text: 'Se Déconnecter',
+            style: 'destructive',
+            onPress: async () => {
+              setRedirectCount(0);
+              setLoopDetected(false);
+              await signOut();
+              router.replace('/login');
+            },
+          },
+          {
+            text: 'Annuler',
+            style: 'cancel',
+            onPress: () => {
+              setRedirectCount(0);
+              setLoopDetected(false);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     if (!user && !inLogin) {
       console.log('[Navigation] No user detected, redirecting to login');
+      lastRedirectTime.current = now;
       router.replace('/login');
     } else if (user && !userProfile?.username && !inUsernameSetup) {
       console.log('[Navigation] User missing username, redirecting to setup');
+      console.log('[Navigation] User ID:', user.id);
+      console.log('[Navigation] User Profile:', userProfile);
+      lastRedirectTime.current = now;
       router.replace('/username-setup');
     } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin) {
       console.log('[Navigation] User authenticated, redirecting to tabs');
+      lastRedirectTime.current = now;
       router.replace('/(tabs)');
     }
-  }, [user, userProfile, loading, segments]);
+  }, [user, userProfile, loading, segments, redirectCount]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

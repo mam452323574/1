@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Heart, Check, X, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -74,7 +74,10 @@ export default function UsernameSetupScreen() {
   };
 
   const handleComplete = async () => {
-    if (!user) return;
+    if (!user) {
+      console.error('[UsernameSetup] No user found');
+      return;
+    }
 
     if (!username) {
       setError('Veuillez choisir un nom d\'utilisateur');
@@ -90,13 +93,20 @@ export default function UsernameSetupScreen() {
       setLoading(true);
       setError(null);
 
+      console.log('[UsernameSetup] Starting profile completion for user:', user.id);
+      console.log('[UsernameSetup] Username:', username);
+      console.log('[UsernameSetup] Avatar URL:', avatarUrl);
+
       await updateUserProfile({
         username,
         avatar_url: avatarUrl,
       });
+      console.log('[UsernameSetup] Profile updated successfully');
 
       const provider = user.app_metadata.provider || 'google';
-      await supabase.from('oauth_connections').insert({
+      console.log('[UsernameSetup] Creating OAuth connection for provider:', provider);
+
+      const { error: oauthError } = await supabase.from('oauth_connections').insert({
         user_id: user.id,
         provider,
         provider_user_id: user.id,
@@ -104,8 +114,16 @@ export default function UsernameSetupScreen() {
         metadata: user.user_metadata || {},
       });
 
+      if (oauthError && !oauthError.message.includes('duplicate')) {
+        console.error('[UsernameSetup] OAuth connection error:', oauthError);
+        throw oauthError;
+      }
+      console.log('[UsernameSetup] OAuth connection created successfully');
+
       const today = new Date().toISOString().split('T')[0];
-      await supabase.from('health_scores').insert({
+      console.log('[UsernameSetup] Creating initial health score');
+
+      const { error: healthError } = await supabase.from('health_scores').insert({
         user_id: user.id,
         score: 50,
         calories_current: 0,
@@ -115,9 +133,27 @@ export default function UsernameSetupScreen() {
         date: today,
       });
 
+      if (healthError && !healthError.message.includes('duplicate')) {
+        console.error('[UsernameSetup] Health score error:', healthError);
+        throw healthError;
+      }
+      console.log('[UsernameSetup] Initial health score created successfully');
+
+      console.log('[UsernameSetup] Setup complete, redirecting to tabs');
       router.replace('/(tabs)');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la configuration');
+      console.error('[UsernameSetup] Critical error during setup:', err);
+
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la configuration';
+      setError(errorMessage);
+
+      Alert.alert(
+        'Erreur de Configuration',
+        `Une erreur est survenue lors de la création de votre profil:\n\n${errorMessage}\n\nVeuillez réessayer ou contacter le support si le problème persiste.`,
+        [
+          { text: 'OK', style: 'default' }
+        ]
+      );
     } finally {
       setLoading(false);
     }
