@@ -11,7 +11,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { userProfile, signOut } = useAuth();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     Alert.alert(
       'Déconnexion',
       'Êtes-vous sûr de vouloir vous déconnecter ?',
@@ -28,7 +28,8 @@ export default function SettingsScreen() {
               await signOut();
               router.replace('/login');
             } catch (error) {
-              Alert.alert('Erreur', 'Impossible de se déconnecter');
+              console.error('Sign out error:', error);
+              Alert.alert('Erreur', 'Impossible de se déconnecter. Veuillez réessayer.');
             }
           },
         },
