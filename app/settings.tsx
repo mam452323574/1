@@ -31,14 +31,11 @@ export default function SettingsScreen() {
               setIsSigningOut(true);
               console.log('[Settings] User confirmed sign out');
 
-              router.back();
-
-              await signOut();
-              console.log('[Settings] Sign out completed, navigation will be handled by _layout');
+              await signOut(router);
+              console.log('[Settings] Sign out completed - user redirected to login');
             } catch (error) {
               console.error('[Settings] Sign out error:', error);
               Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion.');
-            } finally {
               setIsSigningOut(false);
             }
           },
