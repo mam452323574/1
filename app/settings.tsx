@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator, Platform } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Crown, ChevronRight, Shield, LogOut, Bell, ChevronLeft, AlertTriangle, Settings } from 'lucide-react-native';
@@ -17,6 +17,30 @@ export default function SettingsScreen() {
   const { notificationCount } = useNotificationContext();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  useEffect(() => {
+    console.log('[Settings] Screen mounted, resetting isSigningOut state');
+    setIsSigningOut(false);
+
+    const timeout = setTimeout(() => {
+      if (isSigningOut) {
+        console.warn('[Settings] isSigningOut was stuck, force resetting to false');
+        setIsSigningOut(false);
+      }
+    }, 10000);
+
+    return () => clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    if (isSigningOut) {
+      const resetTimeout = setTimeout(() => {
+        console.warn('[Settings] Sign out took too long, resetting state');
+        setIsSigningOut(false);
+      }, 15000);
+      return () => clearTimeout(resetTimeout);
+    }
+  }, [isSigningOut]);
+
   const handleNotificationsPress = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -32,60 +56,79 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    console.log('[Settings] handleSignOut called, isSigningOut:', isSigningOut);
+
+    if (isSigningOut) {
+      console.log('[Settings] Already signing out, ignoring click');
+      return;
     }
 
-    Alert.alert(
-      '⚠️ Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?\n\nVos données seront sauvegardées et vous pourrez vous reconnecter à tout moment.',
-      [
-        {
-          text: 'Annuler',
-          style: 'cancel',
-          onPress: () => {
-            console.log('[Settings] Sign out cancelled');
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+
+      console.log('[Settings] Showing sign out confirmation dialog');
+      Alert.alert(
+        '⚠️ Déconnexion',
+        'Êtes-vous sûr de vouloir vous déconnecter ?\n\nVos données seront sauvegardées et vous pourrez vous reconnecter à tout moment.',
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel',
+            onPress: () => {
+              console.log('[Settings] Sign out cancelled by user');
+            },
           },
-        },
-        {
-          text: 'Se Déconnecter',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsSigningOut(true);
-              console.log('[Settings] User confirmed sign out');
+          {
+            text: 'Se Déconnecter',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                console.log('[Settings] User confirmed sign out, setting isSigningOut to true');
+                setIsSigningOut(true);
 
-              if (Platform.OS !== 'web') {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              }
+                if (Platform.OS !== 'web') {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                }
 
-              const result = await navigationService.safeSignOut(signOut);
+                console.log('[Settings] Calling navigationService.safeSignOut');
+                const result = await navigationService.safeSignOut(signOut);
 
-              if (!result.success) {
-                console.error('[Settings] Sign out failed:', result.error);
+                if (!result.success) {
+                  console.error('[Settings] Sign out failed:', result.error);
+                  setIsSigningOut(false);
+                  Alert.alert(
+                    'Erreur',
+                    'Une erreur est survenue lors de la déconnexion. Veuillez réessayer.',
+                    [
+                      {
+                        text: 'OK',
+                      },
+                    ]
+                  );
+                }
+              } catch (error) {
+                console.error('[Settings] Unexpected sign out error:', error);
+                setIsSigningOut(false);
                 Alert.alert(
                   'Erreur',
-                  'Une erreur est survenue lors de la déconnexion. Veuillez réessayer.',
+                  'Impossible de se déconnecter. Veuillez vérifier votre connexion.',
                   [
                     {
                       text: 'OK',
-                      onPress: () => setIsSigningOut(false),
                     },
                   ]
                 );
               }
-            } catch (error) {
-              console.error('[Settings] Unexpected sign out error:', error);
-              Alert.alert(
-                'Erreur',
-                'Impossible de se déconnecter. Veuillez vérifier votre connexion.'
-              );
-              setIsSigningOut(false);
-            }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      console.error('[Settings] Error in handleSignOut:', error);
+      setIsSigningOut(false);
+    }
   };
 
   if (!userProfile) {
@@ -106,7 +149,12 @@ export default function SettingsScreen() {
         <Text style={styles.headerTitle}>Paramètres</Text>
         <View style={styles.headerPlaceholder} />
       </View>
-      <ScrollView style={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContentContainer}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={true}
+      >
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
           {userProfile.avatar_url ? (
@@ -207,6 +255,8 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={[styles.signOutButton, isSigningOut && styles.signOutButtonDisabled]}
           onPress={handleSignOut}
+          onPressIn={() => console.log('[Settings] Button pressed in')}
+          onPressOut={() => console.log('[Settings] Button pressed out')}
           activeOpacity={0.7}
           disabled={isSigningOut}
         >
@@ -261,6 +311,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flex: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: SPACING.xxxl + SPACING.xl,
   },
   header: {
     alignItems: 'center',
@@ -377,12 +430,12 @@ const styles = StyleSheet.create({
   },
   dangerZone: {
     marginTop: SPACING.xxl,
-    paddingHorizontal: SPACING.page,
     marginBottom: SPACING.xl,
+    marginHorizontal: SPACING.page,
     paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
     backgroundColor: '#FFF5F5',
     borderRadius: BORDER_RADIUS.lg,
-    marginHorizontal: SPACING.page,
     borderWidth: 1.5,
     borderColor: '#FFCCCC',
   },
@@ -414,6 +467,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    zIndex: 10,
+    position: 'relative',
   },
   signOutButtonDisabled: {
     opacity: 0.6,
