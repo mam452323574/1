@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Crown, ChevronRight, Shield, LogOut, Bell, ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +11,8 @@ import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants
 export default function SettingsScreen() {
   const router = useRouter();
   const { userProfile, signOut } = useAuth();
+
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -25,10 +28,11 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              setIsSigningOut(true);
               await signOut();
-              router.replace('/login');
             } catch (error) {
               console.error('Sign out error:', error);
+              setIsSigningOut(false);
               Alert.alert('Erreur', 'Impossible de se déconnecter. Veuillez réessayer.');
             }
           },
@@ -125,9 +129,16 @@ export default function SettingsScreen() {
           style={styles.signOutButton}
           onPress={handleSignOut}
           activeOpacity={0.8}
+          disabled={isSigningOut}
         >
-          <LogOut color={COLORS.error} size={20} />
-          <Text style={styles.signOutText}>Se Déconnecter</Text>
+          {isSigningOut ? (
+            <ActivityIndicator color={COLORS.error} size="small" />
+          ) : (
+            <LogOut color={COLORS.error} size={20} />
+          )}
+          <Text style={styles.signOutText}>
+            {isSigningOut ? 'Déconnexion...' : 'Se Déconnecter'}
+          </Text>
         </TouchableOpacity>
       </View>
 
