@@ -92,6 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, username: string, avatarUrl?: string) => {
+    console.log('[SignUp] Starting signup process for username:', username);
+
+    const isAvailable = await checkUsernameAvailability(username);
+    if (!isAvailable) {
+      throw new Error('Ce nom d\'utilisateur est déjà pris. Veuillez en choisir un autre.');
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -100,35 +107,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
 
     if (data.user) {
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: data.user.id,
-          email: data.user.email!,
-          username,
-          avatar_url: avatarUrl || null,
-          account_tier: 'free',
+      try {
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: data.user.id,
+            email: data.user.email!,
+            username,
+            avatar_url: avatarUrl || null,
+            account_tier: 'free',
+          });
+
+        if (profileError) {
+          if (profileError.code === '23505') {
+            await supabase.auth.admin.deleteUser(data.user.id);
+            throw new Error('Ce nom d\'utilisateur a été pris pendant la création du compte. Veuillez réessayer.');
+          }
+          throw profileError;
+        }
+
+        await supabase.from('oauth_connections').insert({
+          user_id: data.user.id,
+          provider: 'email',
+          provider_user_id: data.user.id,
+          provider_email: email,
         });
 
-      if (profileError) throw profileError;
+        const today = new Date().toISOString().split('T')[0];
+        await supabase.from('health_scores').insert({
+          user_id: data.user.id,
+          score: 50,
+          calories_current: 0,
+          calories_goal: 2000,
+          bodyfat: 20,
+          muscle: 40,
+          date: today,
+        });
 
-      await supabase.from('oauth_connections').insert({
-        user_id: data.user.id,
-        provider: 'email',
-        provider_user_id: data.user.id,
-        provider_email: email,
-      });
-
-      const today = new Date().toISOString().split('T')[0];
-      await supabase.from('health_scores').insert({
-        user_id: data.user.id,
-        score: 50,
-        calories_current: 0,
-        calories_goal: 2000,
-        bodyfat: 20,
-        muscle: 40,
-        date: today,
-      });
+        console.log('[SignUp] Signup completed successfully');
+      } catch (profileError) {
+        console.error('[SignUp] Profile creation failed, cleaning up auth user:', profileError);
+        try {
+          await supabase.auth.signOut();
+        } catch (cleanupError) {
+          console.error('[SignUp] Cleanup error:', cleanupError);
+        }
+        throw profileError;
+      }
     }
   };
 
@@ -282,17 +307,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return !!data;
   };
 
-  const checkUsernameAvailability = async (username: string): Promise<boolean> => {
+  const checkUsernameAvailability = async (username: string, retryCount = 0): Promise<boolean> => {
     if (!username || username.length < 3) return false;
 
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('username')
-      .eq('username', username)
-      .maybeSingle();
+    const maxRetries = 3;
+    const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+    const queryTimeout = 8000;
 
-    if (error) throw error;
-    return !data;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Query timeout exceeded')), queryTimeout);
+      });
+
+      const queryPromise = supabase
+        .from('user_profiles')
+        .select('username')
+        .eq('username', username)
+        .maybeSingle();
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+
+      if (error) {
+        throw error;
+      }
+      return !data;
+    } catch (error) {
+      if (retryCount < maxRetries && error instanceof Error &&
+          (error.message.includes('network') || error.message.includes('timeout') || error.message.includes('Query timeout'))) {
+        console.log(`[Username Check] Error, retrying... (${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return checkUsernameAvailability(username, retryCount + 1);
+      }
+      throw error;
+    }
   };
 
   const updateUserProfile = async (updates: Partial<UserProfile>) => {

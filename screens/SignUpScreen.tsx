@@ -17,7 +17,7 @@ export default function SignUpScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'error'>('idle');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'network_error' | 'timeout'>('idle');
   const [checkTimeout, setCheckTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -50,7 +50,14 @@ export default function SignUpScreen() {
         setUsernameStatus(isAvailable ? 'available' : 'taken');
       } catch (error) {
         console.error('[Username Check] Error:', error);
-        setUsernameStatus('error');
+        const errorMessage = error instanceof Error ? error.message : '';
+        if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+          setUsernameStatus('network_error');
+        } else if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+          setUsernameStatus('timeout');
+        } else {
+          setUsernameStatus('network_error');
+        }
       }
     }, 500);
 
@@ -89,8 +96,10 @@ export default function SignUpScreen() {
       return;
     }
 
-    if (usernameStatus === 'error') {
+    if (usernameStatus === 'network_error' || usernameStatus === 'timeout') {
       try {
+        console.log('[SignUp] Retrying username verification before signup...');
+        setUsernameStatus('checking');
         const isAvailable = await checkUsernameAvailability(username);
         if (!isAvailable) {
           setError('Ce nom d\'utilisateur est déjà pris');
@@ -98,8 +107,11 @@ export default function SignUpScreen() {
           return;
         }
         setUsernameStatus('available');
+        console.log('[SignUp] Username verified successfully');
       } catch (err) {
-        setError('Impossible de vérifier la disponibilité du nom d\'utilisateur');
+        console.error('[SignUp] Final verification failed:', err);
+        setError('Impossible de vérifier la disponibilité du nom d\'utilisateur. Veuillez vérifier votre connexion et réessayer.');
+        setUsernameStatus('network_error');
         return;
       }
     }
@@ -152,7 +164,8 @@ export default function SignUpScreen() {
         return <X color={COLORS.error} size={20} />;
       case 'invalid':
         return <AlertCircle color={COLORS.error} size={20} />;
-      case 'error':
+      case 'network_error':
+      case 'timeout':
         return <AlertCircle color={COLORS.warning} size={20} />;
       default:
         return null;
@@ -169,8 +182,10 @@ export default function SignUpScreen() {
         return 'Déjà pris, essayez un autre';
       case 'invalid':
         return '3-20 caractères : lettres, chiffres, _ ou -';
-      case 'error':
-        return 'Erreur de vérification (vous pouvez quand même continuer)';
+      case 'network_error':
+        return 'Erreur réseau - Touchez pour réessayer';
+      case 'timeout':
+        return 'Délai d\'attente dépassé - Touchez pour réessayer';
       default:
         return '3-20 caractères : lettres, chiffres, _ ou -';
     }
@@ -185,7 +200,8 @@ export default function SignUpScreen() {
       case 'taken':
       case 'invalid':
         return COLORS.error;
-      case 'error':
+      case 'network_error':
+      case 'timeout':
         return COLORS.warning;
       default:
         return COLORS.gray;
@@ -232,9 +248,30 @@ export default function SignUpScreen() {
                   {getUsernameStatusIcon()}
                 </View>
               </View>
-              <Text style={[styles.statusText, { color: getUsernameStatusColor() }]}>
-                {getUsernameStatusText()}
-              </Text>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (usernameStatus === 'network_error' || usernameStatus === 'timeout') {
+                    setUsernameStatus('checking');
+                    try {
+                      const isAvailable = await checkUsernameAvailability(username);
+                      setUsernameStatus(isAvailable ? 'available' : 'taken');
+                    } catch (error) {
+                      console.error('[Manual Retry] Error:', error);
+                      const errorMessage = error instanceof Error ? error.message : '';
+                      if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+                        setUsernameStatus('timeout');
+                      } else {
+                        setUsernameStatus('network_error');
+                      }
+                    }
+                  }
+                }}
+                disabled={usernameStatus !== 'network_error' && usernameStatus !== 'timeout'}
+              >
+                <Text style={[styles.statusText, { color: getUsernameStatusColor() }]}>
+                  {getUsernameStatusText()}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.inputContainer}>
