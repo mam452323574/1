@@ -2,7 +2,6 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Act
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as Updates from 'expo-updates';
 import { Crown, ChevronRight, Shield, LogOut, Bell, ChevronLeft, AlertTriangle, Settings } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
@@ -93,11 +92,11 @@ export default function SettingsScreen() {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                 }
 
-                console.log('[Settings] Step 1: Calling signOut to cleanup all data');
+                console.log('[Settings] Calling signOut and navigating to login');
                 await signOut();
 
-                console.log('[Settings] Step 2: Forcing app reload');
-                await Updates.reloadAsync();
+                console.log('[Settings] Redirecting to login page');
+                router.replace('/login');
 
               } catch (error) {
                 console.error('[Settings] Sign out error:', error);

@@ -29,11 +29,11 @@ function RootLayoutNav() {
     const now = Date.now();
     const timeSinceLastRedirect = now - lastRedirectTime.current;
 
-    if (timeSinceLastRedirect < 1000 && !inAuthGroup) {
+    if (timeSinceLastRedirect < 1000 && !inAuthGroup && !inLogin) {
       console.warn('[Navigation] Rapid redirect detected, incrementing counter');
       setRedirectCount(prev => prev + 1);
     } else {
-      if (inAuthGroup && redirectCount > 0) {
+      if ((inAuthGroup || inLogin) && redirectCount > 0) {
         console.log('[Navigation] User reached stable state, resetting counter');
         setRedirectCount(0);
         setLoopDetected(false);
