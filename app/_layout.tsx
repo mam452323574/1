@@ -14,7 +14,7 @@ function RootLayoutNav() {
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy';
+    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy' || segments[0] === 'notifications' || segments[0] === 'notification-settings';
     const inUsernameSetup = segments[0] === 'username-setup';
     const inPremiumUpgrade = segments[0] === 'premium-upgrade';
     const inLogin = segments[0] === 'login' || segments[0] === 'signup';
@@ -40,6 +40,8 @@ function RootLayoutNav() {
       <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
       <Stack.Screen name="premium-plan" options={{ presentation: 'modal' }} />
       <Stack.Screen name="privacy-policy" />
+      <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="notification-settings" options={{ presentation: 'modal' }} />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="recipes" options={{ presentation: 'modal' }} />
       <Stack.Screen name="exercises" options={{ presentation: 'modal' }} />

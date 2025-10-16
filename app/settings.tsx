@@ -1,53 +1,85 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator, Platform } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Crown, ChevronRight, Shield, LogOut, Bell, ChevronLeft } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { Crown, ChevronRight, Shield, LogOut, Bell, ChevronLeft, AlertTriangle, Settings } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { AccountBadge } from '@/components/AccountBadge';
 import { Button } from '@/components/Button';
 import { ModalHandle } from '@/components/ModalHandle';
+import { navigationService } from '@/services/navigation';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { userProfile, signOut } = useAuth();
-
+  const { notificationCount } = useNotificationContext();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  const handleNotificationsPress = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    navigationService.navigateToNotifications();
+  };
+
+  const handleNotificationSettingsPress = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    router.push('/notification-settings');
+  };
+
   const handleSignOut = async () => {
-    console.log('[Settings] handleSignOut called - button was clicked!');
-    console.log('[Settings] signOut function exists:', !!signOut);
-    console.log('[Settings] userProfile exists:', !!userProfile);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
 
     Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      '⚠️ Déconnexion',
+      'Êtes-vous sûr de vouloir vous déconnecter ?\n\nVos données seront sauvegardées et vous pourrez vous reconnecter à tout moment.',
       [
         {
           text: 'Annuler',
           style: 'cancel',
+          onPress: () => {
+            console.log('[Settings] Sign out cancelled');
+          },
         },
         {
-          text: 'Se déconnecter',
+          text: 'Se Déconnecter',
           style: 'destructive',
           onPress: async () => {
             try {
               setIsSigningOut(true);
               console.log('[Settings] User confirmed sign out');
 
-              console.log('[Settings] Step 1: Dismissing all modals');
-              router.dismissAll();
+              if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              }
 
-              console.log('[Settings] Step 2: Waiting for modal animations to complete');
-              await new Promise(resolve => setTimeout(resolve, 300));
+              const result = await navigationService.safeSignOut(signOut);
 
-              console.log('[Settings] Step 3: Calling signOut to clear authentication');
-              await signOut();
-
-              console.log('[Settings] Sign out complete - root layout will handle navigation');
+              if (!result.success) {
+                console.error('[Settings] Sign out failed:', result.error);
+                Alert.alert(
+                  'Erreur',
+                  'Une erreur est survenue lors de la déconnexion. Veuillez réessayer.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => setIsSigningOut(false),
+                    },
+                  ]
+                );
+              }
             } catch (error) {
-              console.error('[Settings] Sign out error:', error);
-              Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion.');
+              console.error('[Settings] Unexpected sign out error:', error);
+              Alert.alert(
+                'Erreur',
+                'Impossible de se déconnecter. Veuillez vérifier votre connexion.'
+              );
               setIsSigningOut(false);
             }
           },
@@ -113,12 +145,37 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>Préférences</Text>
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => {}}
-          activeOpacity={0.8}
+          onPress={handleNotificationsPress}
+          activeOpacity={0.7}
         >
           <View style={styles.menuItemLeft}>
             <Bell color={COLORS.primaryText} size={20} />
-            <Text style={styles.menuItemText}>Notifications</Text>
+            <View>
+              <Text style={styles.menuItemText}>Notifications</Text>
+              {notificationCount > 0 && (
+                <Text style={styles.menuItemSubtext}>
+                  {notificationCount} nouvelle{notificationCount > 1 ? 's' : ''}
+                </Text>
+              )}
+            </View>
+          </View>
+          <View style={styles.menuItemRight}>
+            {notificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{notificationCount}</Text>
+              </View>
+            )}
+            <ChevronRight color={COLORS.gray} size={20} />
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleNotificationSettingsPress}
+          activeOpacity={0.7}
+        >
+          <View style={styles.menuItemLeft}>
+            <Settings color={COLORS.primaryText} size={20} />
+            <Text style={styles.menuItemText}>Préférences de notifications</Text>
           </View>
           <ChevronRight color={COLORS.gray} size={20} />
         </TouchableOpacity>
@@ -140,23 +197,27 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.dangerZone}>
+        <View style={styles.dangerZoneHeader}>
+          <AlertTriangle color={COLORS.error} size={20} />
+          <Text style={styles.dangerZoneTitle}>Zone Dangereuse</Text>
+        </View>
+        <Text style={styles.dangerZoneDescription}>
+          Cette action vous déconnectera de votre compte. Vos données seront conservées.
+        </Text>
         <TouchableOpacity
-          style={styles.signOutButton}
-          onPress={() => {
-            console.log('[Settings] TouchableOpacity onPress triggered!');
-            handleSignOut();
-          }}
-          activeOpacity={0.8}
+          style={[styles.signOutButton, isSigningOut && styles.signOutButtonDisabled]}
+          onPress={handleSignOut}
+          activeOpacity={0.7}
           disabled={isSigningOut}
         >
           <View style={styles.signOutButtonContent}>
             {isSigningOut ? (
               <ActivityIndicator color={COLORS.error} size="small" />
             ) : (
-              <LogOut color={COLORS.error} size={20} />
+              <LogOut color={COLORS.error} size={22} strokeWidth={2.5} />
             )}
             <Text style={styles.signOutText}>
-              {isSigningOut ? 'Déconnexion...' : 'Se Déconnecter'}
+              {isSigningOut ? 'Déconnexion en cours...' : 'Se Déconnecter'}
             </Text>
           </View>
         </TouchableOpacity>
@@ -289,19 +350,73 @@ const styles = StyleSheet.create({
     color: COLORS.primaryText,
     fontWeight: FONT_WEIGHTS.regular,
   },
+  menuItemSubtext: {
+    fontSize: SIZES.text12,
+    color: COLORS.primary,
+    marginTop: 2,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  menuItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  notificationBadge: {
+    backgroundColor: COLORS.error,
+    borderRadius: BORDER_RADIUS.full,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: SPACING.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationBadgeText: {
+    fontSize: SIZES.text12,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.white,
+  },
   dangerZone: {
-    marginTop: SPACING.xl,
+    marginTop: SPACING.xxl,
     paddingHorizontal: SPACING.page,
     marginBottom: SPACING.xl,
+    paddingVertical: SPACING.lg,
+    backgroundColor: '#FFF5F5',
+    borderRadius: BORDER_RADIUS.lg,
+    marginHorizontal: SPACING.page,
+    borderWidth: 1.5,
+    borderColor: '#FFCCCC',
+  },
+  dangerZoneHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  dangerZoneTitle: {
+    fontSize: SIZES.text16,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.error,
+  },
+  dangerZoneDescription: {
+    fontSize: SIZES.text14,
+    color: COLORS.gray,
+    marginBottom: SPACING.lg,
+    lineHeight: 20,
   },
   signOutButton: {
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
+    padding: SPACING.lg,
+    borderWidth: 2,
     borderColor: COLORS.error,
-    zIndex: 10,
-    elevation: 5,
+    shadowColor: COLORS.error,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  signOutButtonDisabled: {
+    opacity: 0.6,
   },
   signOutButtonContent: {
     flexDirection: 'row',
