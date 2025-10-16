@@ -31,8 +31,16 @@ export default function SettingsScreen() {
               setIsSigningOut(true);
               console.log('[Settings] User confirmed sign out');
 
-              await signOut(router);
-              console.log('[Settings] Sign out completed - user redirected to login');
+              console.log('[Settings] Step 1: Dismissing all modals');
+              router.dismissAll();
+
+              console.log('[Settings] Step 2: Waiting for modal animations to complete');
+              await new Promise(resolve => setTimeout(resolve, 300));
+
+              console.log('[Settings] Step 3: Calling signOut to clear authentication');
+              await signOut();
+
+              console.log('[Settings] Sign out complete - root layout will handle navigation');
             } catch (error) {
               console.error('[Settings] Sign out error:', error);
               Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion.');

@@ -19,10 +19,10 @@ function RootLayoutNav() {
     const inPremiumUpgrade = segments[0] === 'premium-upgrade';
     const inLogin = segments[0] === 'login' || segments[0] === 'signup';
 
-    // Note: Sign out navigation is handled directly by the signOut function in AuthContext
-    // This useEffect only handles initial app load and username setup redirections
-
-    if (user && !userProfile?.username && !inUsernameSetup) {
+    if (!user && !inLogin) {
+      console.log('[Navigation] No user detected, redirecting to login');
+      router.replace('/login');
+    } else if (user && !userProfile?.username && !inUsernameSetup) {
       console.log('[Navigation] User missing username, redirecting to setup');
       router.replace('/username-setup');
     } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin) {

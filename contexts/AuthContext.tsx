@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import { UserProfile, OAuthProvider } from '@/types';
 
@@ -18,7 +17,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, username: string, avatarUrl?: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
-  signOut: (router?: Router) => Promise<void>;
+  signOut: () => Promise<void>;
   checkUsernameAvailability: (username: string) => Promise<boolean>;
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
@@ -326,17 +325,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return !!data;
   };
 
-  const signOut = async (router?: Router) => {
+  const signOut = async () => {
     try {
       console.log('[SignOut] Starting sign out process...');
 
-      // STEP 1: Clear all local React state immediately
       setUserProfile(null);
       setUser(null);
       setSession(null);
-      console.log('[SignOut] Local state cleared immediately');
+      console.log('[SignOut] Local state cleared');
 
-      // STEP 2: Clear AsyncStorage
       try {
         await AsyncStorage.multiRemove([
           'supabase.auth.token',
@@ -347,7 +344,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('[SignOut] Error clearing AsyncStorage:', storageError);
       }
 
-      // STEP 3: Sign out from Supabase
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) {
         console.error('[SignOut] Supabase sign out error:', error);
@@ -355,26 +351,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[SignOut] Successfully signed out from Supabase');
       }
 
-      // STEP 4: Force navigation to login if router is provided
-      if (router) {
-        console.log('[SignOut] Forcing navigation to /login');
-        router.replace('/login');
-      }
-
       console.log('[SignOut] Sign out complete');
     } catch (error) {
       console.error('[SignOut] Error during sign out:', error);
 
-      // Guarantee state cleanup even on error
       setUserProfile(null);
       setUser(null);
       setSession(null);
-
-      // Guarantee navigation to login even on error
-      if (router) {
-        console.log('[SignOut] Error occurred but forcing navigation to /login anyway');
-        router.replace('/login');
-      }
     }
   };
 
