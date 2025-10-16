@@ -5,7 +5,7 @@ import { ApiService } from '@/services/api';
 import { AnalyticsData } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
-import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
+import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
 
 const screenWidth = Dimensions.get('window').width;
 
