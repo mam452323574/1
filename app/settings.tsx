@@ -30,13 +30,14 @@ export default function SettingsScreen() {
             try {
               setIsSigningOut(true);
               console.log('[Settings] User confirmed sign out');
+
+              router.back();
+
               await signOut();
-              console.log('[Settings] Sign out completed');
-              router.replace('/login');
+              console.log('[Settings] Sign out completed, navigation will be handled by _layout');
             } catch (error) {
               console.error('[Settings] Sign out error:', error);
-              Alert.alert('Erreur', 'Une erreur est survenue, mais vous avez été déconnecté.');
-              router.replace('/login');
+              Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion.');
             } finally {
               setIsSigningOut(false);
             }
