@@ -6,6 +6,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { BadgeProvider } from '@/contexts/BadgeContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Button } from '@/components/Button';
 import { COLORS, SPACING, SIZES } from '@/constants/theme';
 
@@ -110,13 +111,15 @@ export default function RootLayout() {
   useFrameworkReady();
 
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <BadgeProvider>
-          <RootLayoutNav />
-          <StatusBar style="auto" />
-        </BadgeProvider>
-      </NotificationProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NotificationProvider>
+          <BadgeProvider>
+            <RootLayoutNav />
+            <StatusBar style="auto" />
+          </BadgeProvider>
+        </NotificationProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

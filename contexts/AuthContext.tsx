@@ -33,12 +33,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[AuthProvider] Initializing authentication...');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('[AuthProvider] Session loaded:', session ? 'with user' : 'no session');
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        console.log('[AuthProvider] Loading user profile for:', session.user.id);
         await loadUserProfile(session.user.id);
       }
+      setLoading(false);
+      console.log('[AuthProvider] Initialization complete');
+    }).catch((error) => {
+      console.error('[AuthProvider] Error loading session:', error);
       setLoading(false);
     });
 

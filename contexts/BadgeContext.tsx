@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -64,7 +65,7 @@ export function BadgeProvider({ children }: { children: ReactNode }) {
 
   const loadBadgeState = async () => {
     try {
-      const stored = localStorage.getItem(BADGE_STORAGE_KEY);
+      const stored = await AsyncStorage.getItem(BADGE_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         setBadges(parsed.badges || badges);
@@ -83,7 +84,7 @@ export function BadgeProvider({ children }: { children: ReactNode }) {
         lastCheckedRecipes,
         lastCheckedExercises,
       };
-      localStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify(state));
+      await AsyncStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
       console.error('Error saving badge state:', error);
     }
