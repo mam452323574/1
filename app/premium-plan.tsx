@@ -7,6 +7,7 @@ import { supabase } from '@/services/supabase';
 import { PremiumFeature } from '@/types';
 import { FeatureComparisonList } from '@/components/FeatureComparisonList';
 import { Button } from '@/components/Button';
+import { ModalHandle } from '@/components/ModalHandle';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
 
 export default function PremiumPlanScreen() {
@@ -40,6 +41,7 @@ export default function PremiumPlanScreen() {
 
   return (
     <View style={styles.container}>
+      <ModalHandle />
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.closeButton}

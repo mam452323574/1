@@ -4,6 +4,7 @@ import { Crown, ChevronRight, Shield, LogOut, Bell, ChevronLeft } from 'lucide-r
 import { useAuth } from '@/contexts/AuthContext';
 import { AccountBadge } from '@/components/AccountBadge';
 import { Button } from '@/components/Button';
+import { ModalHandle } from '@/components/ModalHandle';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
 
 export default function SettingsScreen() {
@@ -41,6 +42,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
+      <ModalHandle />
       <View style={styles.headerBar}>
         <TouchableOpacity
           style={styles.backButton}

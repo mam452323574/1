@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Crown, Check, X, Star, Zap, TrendingUp, Award } from 'lucide-react-native';
+import { Crown, Check, X, Star, Zap, TrendingUp, Award, RefreshCw } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
+import { ModalHandle } from '@/components/ModalHandle';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 import { supabase } from '@/services/supabase';
 import { PremiumFeature } from '@/types';
+import { paymentService } from '@/services/payment';
 
 export default function PremiumUpgradeScreen() {
   const router = useRouter();
@@ -14,10 +16,29 @@ export default function PremiumUpgradeScreen() {
   const [features, setFeatures] = useState<PremiumFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [productPrice, setProductPrice] = useState<string>('9,99 €');
 
   useEffect(() => {
     loadFeatures();
+    initializePayment();
+
+    return () => {
+      paymentService.cleanup();
+    };
   }, []);
+
+  const initializePayment = async () => {
+    try {
+      await paymentService.initialize();
+      const product = await paymentService.getProductDetails();
+      if (product && product.localizedPrice) {
+        setProductPrice(product.localizedPrice);
+      }
+    } catch (error) {
+      console.error('Error initializing payment:', error);
+    }
+  };
 
   const loadFeatures = async () => {
     try {
@@ -38,11 +59,123 @@ export default function PremiumUpgradeScreen() {
   };
 
   const handlePurchase = async () => {
-    setPurchasing(true);
-    setTimeout(() => {
-      router.back();
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Non disponible sur Web',
+        'Les achats in-app ne sont disponibles que sur les applications mobiles natives (Android/iOS). Veuillez utiliser l\'application mobile pour effectuer un achat.'
+      );
+      return;
+    }
+
+    try {
+      setPurchasing(true);
+
+      const result = await paymentService.purchaseProduct();
+
+      if (result.success) {
+        Alert.alert(
+          'Validation en cours',
+          'Votre achat est en cours de validation. Veuillez patienter quelques instants...'
+        );
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await refreshUserProfile();
+
+        Alert.alert(
+          'Bienvenue dans Premium!',
+          'Votre abonnement Premium a été activé avec succès. Profitez de toutes les fonctionnalités!',
+          [
+            {
+              text: 'Continuer',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else if (result.error === 'cancelled') {
+        console.log('Purchase cancelled by user');
+      } else {
+        Alert.alert(
+          'Erreur d\'achat',
+          result.message || 'Une erreur est survenue lors de l\'achat. Veuillez réessayer.'
+        );
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      Alert.alert(
+        'Erreur',
+        'Impossible de traiter votre achat. Veuillez vérifier votre connexion et réessayer.'
+      );
+    } finally {
       setPurchasing(false);
-    }, 1500);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Non disponible sur Web',
+        'La restauration des achats n\'est disponible que sur les applications mobiles.'
+      );
+      return;
+    }
+
+    try {
+      setRestoring(true);
+
+      const result = await paymentService.restorePurchases();
+
+      if (result.success) {
+        await refreshUserProfile();
+
+        Alert.alert(
+          'Achats restaurés',
+          'Votre abonnement Premium a été restauré avec succès!',
+          [
+            {
+              text: 'Continuer',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else if (result.error === 'no_purchases') {
+        Alert.alert(
+          'Aucun achat trouvé',
+          'Aucun achat précédent n\'a été trouvé sur ce compte.'
+        );
+      } else {
+        Alert.alert(
+          'Erreur de restauration',
+          result.message || 'Impossible de restaurer vos achats. Veuillez réessayer.'
+        );
+      }
+    } catch (error) {
+      console.error('Restore error:', error);
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors de la restauration. Veuillez réessayer.'
+      );
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const refreshUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (data) {
+          console.log('User profile refreshed:', data.account_tier);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+    }
   };
 
   const isPremium = userProfile?.account_tier === 'premium';
@@ -69,6 +202,7 @@ export default function PremiumUpgradeScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      <ModalHandle />
       <View style={styles.header}>
         <View style={styles.crownContainer}>
           <Crown color={COLORS.primary} size={64} fill={COLORS.primary} />
@@ -87,10 +221,15 @@ export default function PremiumUpgradeScreen() {
 
       <View style={styles.pricingCard}>
         <View style={styles.pricingHeader}>
-          <Text style={styles.price}>9,99 €</Text>
+          <Text style={styles.price}>{productPrice}</Text>
           <Text style={styles.priceperiod}>/mois</Text>
         </View>
         <Text style={styles.pricingSubtext}>Annulez à tout moment</Text>
+        {Platform.OS !== 'web' && (
+          <Text style={styles.storeBadge}>
+            Via {Platform.OS === 'android' ? 'Google Play' : 'App Store'}
+          </Text>
+        )}
       </View>
 
       <View style={styles.featuresSection}>
@@ -137,19 +276,41 @@ export default function PremiumUpgradeScreen() {
           title={purchasing ? "Traitement en cours..." : "S'abonner maintenant"}
           onPress={handlePurchase}
           loading={purchasing}
+          disabled={restoring}
         />
+        {Platform.OS !== 'web' && (
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={handleRestorePurchases}
+            disabled={purchasing || restoring}
+          >
+            <RefreshCw color={COLORS.primary} size={18} />
+            <Text style={styles.restoreButtonText}>
+              {restoring ? 'Restauration...' : 'Restaurer mes achats'}
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
+          disabled={purchasing || restoring}
         >
           <Text style={styles.backButtonText}>Plus tard</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.disclaimer}>
-        Note: L'intégration complète des achats in-app Google Play / App Store nécessite RevenueCat.
-        Cette interface démontre le flux utilisateur.
-      </Text>
+      {Platform.OS === 'web' && (
+        <Text style={styles.disclaimer}>
+          Note: Les achats in-app ne sont disponibles que sur les applications mobiles natives.
+          Utilisez l'application Android ou iOS pour vous abonner.
+        </Text>
+      )}
+      {Platform.OS !== 'web' && (
+        <Text style={styles.disclaimer}>
+          L'abonnement sera facturé via votre compte {Platform.OS === 'android' ? 'Google Play' : 'App Store'}.
+          Gérez votre abonnement dans les paramètres de votre compte {Platform.OS === 'android' ? 'Google Play' : 'App Store'}.
+        </Text>
+      )}
     </ScrollView>
   );
 }
@@ -285,6 +446,25 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: SIZES.md,
     color: COLORS.gray,
+  },
+  storeBadge: {
+    fontSize: SIZES.xs,
+    color: COLORS.primary,
+    marginTop: SPACING.xs,
+    fontWeight: '600',
+  },
+  restoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.md,
+    padding: SPACING.sm,
+  },
+  restoreButtonText: {
+    fontSize: SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   disclaimer: {
     fontSize: SIZES.xs,

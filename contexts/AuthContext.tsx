@@ -1,7 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/services/supabase';
 import { UserProfile, OAuthProvider } from '@/types';
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface AuthContextType {
   user: User | null;
@@ -117,14 +122,152 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithOAuth = async (provider: 'google' | 'apple') => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
+    try {
+      console.log('[OAuth] Starting OAuth flow for provider:', provider);
 
-    if (error) throw error;
+      const redirectUrl = Platform.OS === 'web'
+        ? window.location.origin
+        : Linking.createURL('oauth/callback');
+
+      console.log('[OAuth] Redirect URL:', redirectUrl);
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web',
+        },
+      });
+
+      if (error) {
+        console.error('[OAuth] Error initiating OAuth:', error);
+        throw error;
+      }
+
+      if (Platform.OS !== 'web' && data?.url) {
+        console.log('[OAuth] Opening browser for authentication...');
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl
+        );
+
+        console.log('[OAuth] Browser result:', result.type);
+
+        if (result.type === 'success' && result.url) {
+          console.log('[OAuth] Success! Processing callback URL...');
+          const { params } = Linking.parse(result.url);
+
+          if (params?.access_token && params?.refresh_token) {
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token: params.access_token as string,
+              refresh_token: params.refresh_token as string,
+            });
+
+            if (sessionError) {
+              console.error('[OAuth] Error setting session:', sessionError);
+              throw sessionError;
+            }
+
+            console.log('[OAuth] Session established successfully');
+
+            if (sessionData.user) {
+              await handleOAuthUserSetup(sessionData.user, provider);
+            }
+          }
+        } else if (result.type === 'cancel') {
+          console.log('[OAuth] User cancelled authentication');
+          throw new Error('Authentication cancelled');
+        }
+      }
+    } catch (error) {
+      console.error('[OAuth] Error in OAuth flow:', error);
+      throw error;
+    }
+  };
+
+  const handleOAuthUserSetup = async (user: User, provider: 'google' | 'apple') => {
+    try {
+      console.log('[OAuth] Setting up OAuth user:', user.id);
+
+      const { data: existingProfile } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (existingProfile) {
+        console.log('[OAuth] Existing user profile found');
+        return;
+      }
+
+      console.log('[OAuth] Creating new user profile for OAuth user');
+
+      const email = user.email || `${user.id}@oauth.temp`;
+      const isDisposable = await checkDisposableEmail(email);
+
+      if (isDisposable) {
+        console.error('[OAuth] Disposable email detected');
+        throw new Error('Disposable email addresses are not allowed');
+      }
+
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: user.id,
+          email: email,
+          username: null,
+          avatar_url: user.user_metadata?.avatar_url || null,
+          account_tier: 'free',
+        });
+
+      if (profileError) {
+        console.error('[OAuth] Error creating profile:', profileError);
+        throw profileError;
+      }
+
+      const { error: oauthError } = await supabase
+        .from('oauth_connections')
+        .insert({
+          user_id: user.id,
+          provider: provider,
+          provider_user_id: user.user_metadata?.sub || user.id,
+          provider_email: email,
+        });
+
+      if (oauthError && !oauthError.message.includes('duplicate')) {
+        console.error('[OAuth] Error creating OAuth connection:', oauthError);
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      await supabase.from('health_scores').insert({
+        user_id: user.id,
+        score: 50,
+        calories_current: 0,
+        calories_goal: 2000,
+        bodyfat: 20,
+        muscle: 40,
+        date: today,
+      });
+
+      console.log('[OAuth] User setup completed successfully');
+    } catch (error) {
+      console.error('[OAuth] Error in user setup:', error);
+      throw error;
+    }
+  };
+
+  const checkDisposableEmail = async (email: string): Promise<boolean> => {
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain) return false;
+
+    const { data } = await supabase
+      .from('disposable_email_domains')
+      .select('domain')
+      .eq('domain', domain)
+      .eq('active', true)
+      .maybeSingle();
+
+    return !!data;
   };
 
   const checkUsernameAvailability = async (username: string): Promise<boolean> => {

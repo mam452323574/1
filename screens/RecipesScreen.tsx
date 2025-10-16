@@ -4,6 +4,7 @@ import { Search } from 'lucide-react-native';
 import { ApiService } from '@/services/api';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
+import { ModalHandle } from '@/components/ModalHandle';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 
 export default function RecipesScreen() {
@@ -74,6 +75,7 @@ export default function RecipesScreen() {
 
   return (
     <View style={styles.container}>
+      <ModalHandle />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Nos Recettes</Text>
         <View style={styles.searchContainer}>
