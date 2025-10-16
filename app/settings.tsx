@@ -29,11 +29,16 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               setIsSigningOut(true);
+              console.log('[Settings] User confirmed sign out');
               await signOut();
+              console.log('[Settings] Sign out completed');
+              router.replace('/login');
             } catch (error) {
-              console.error('Sign out error:', error);
+              console.error('[Settings] Sign out error:', error);
+              Alert.alert('Erreur', 'Une erreur est survenue, mais vous avez été déconnecté.');
+              router.replace('/login');
+            } finally {
               setIsSigningOut(false);
-              Alert.alert('Erreur', 'Impossible de se déconnecter. Veuillez réessayer.');
             }
           },
         },

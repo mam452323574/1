@@ -17,12 +17,16 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy';
     const inUsernameSetup = segments[0] === 'username-setup';
     const inPremiumUpgrade = segments[0] === 'premium-upgrade';
+    const inLogin = segments[0] === 'login' || segments[0] === 'signup';
 
     if (!user && inAuthGroup) {
+      console.log('[Navigation] Not authenticated, redirecting to login');
       router.replace('/login');
     } else if (user && !userProfile?.username && !inUsernameSetup) {
+      console.log('[Navigation] User missing username, redirecting to setup');
       router.replace('/username-setup');
-    } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade) {
+    } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin) {
+      console.log('[Navigation] User authenticated, redirecting to tabs');
       router.replace('/(tabs)');
     }
   }, [user, userProfile, loading, segments]);

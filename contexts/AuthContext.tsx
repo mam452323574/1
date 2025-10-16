@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/services/supabase';
 import { UserProfile, OAuthProvider } from '@/types';
 
@@ -41,14 +42,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session) => {
       (async () => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadUserProfile(session.user.id);
-        } else {
+        console.log('[Auth] Auth state changed:', event, session ? 'with session' : 'no session');
+
+        if (event === 'SIGNED_OUT') {
+          console.log('[Auth] User signed out - clearing state');
+          setSession(null);
+          setUser(null);
           setUserProfile(null);
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await loadUserProfile(session.user.id);
+          } else {
+            setUserProfile(null);
+          }
         }
       })();
     });
@@ -319,27 +329,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('[SignOut] Starting sign out process...');
 
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('[SignOut] Supabase sign out error:', error);
-        throw error;
-      }
-
-      console.log('[SignOut] Successfully signed out from Supabase');
-
       setUserProfile(null);
       setUser(null);
       setSession(null);
+      console.log('[SignOut] Local state cleared immediately');
 
-      console.log('[SignOut] Local state cleared');
+      try {
+        await AsyncStorage.multiRemove([
+          'supabase.auth.token',
+          '@supabase.auth.token',
+        ]);
+        console.log('[SignOut] AsyncStorage cleared');
+      } catch (storageError) {
+        console.error('[SignOut] Error clearing AsyncStorage:', storageError);
+      }
+
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) {
+        console.error('[SignOut] Supabase sign out error:', error);
+      } else {
+        console.log('[SignOut] Successfully signed out from Supabase');
+      }
+
+      console.log('[SignOut] Sign out complete');
     } catch (error) {
       console.error('[SignOut] Error during sign out:', error);
 
       setUserProfile(null);
       setUser(null);
       setSession(null);
-
-      throw error;
     }
   };
 
