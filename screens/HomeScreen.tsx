@@ -14,12 +14,14 @@ import { ActionCard } from '@/components/ActionCard';
 import { ProductCard } from '@/components/ProductCard';
 import { ScanLimitIndicator } from '@/components/ScanLimitIndicator';
 import { FadeInView } from '@/components/FadeInView';
+import { SettingsCog } from '@/components/SettingsCog';
+import { NotificationBell } from '@/components/NotificationBell';
 import { SCAN_TYPE_LABELS } from '@/constants/scan';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { checkForAchievements } = useNotificationContext();
   const [data, setData] = useState<DashboardData | null>(null);
   const [scanLimits, setScanLimits] = useState<Record<ScanType, ScanLimitStatus> | null>(null);
@@ -74,11 +76,12 @@ export default function HomeScreen() {
     >
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Heart color={COLORS.primary} size={28} fill={COLORS.primary} />
-          <View>
-            <Text style={styles.headerTitle}>Health Scan</Text>
-            <Text style={styles.headerSubtitle}>{user?.email}</Text>
-          </View>
+          <Text style={styles.headerTitle}>Health Scan</Text>
+          <Text style={styles.username}>{userProfile?.username || 'Utilisateur'}</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <NotificationBell />
+          <SettingsCog />
         </View>
       </View>
 
@@ -157,24 +160,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING.page,
+    paddingHorizontal: SPACING.page,
     paddingTop: SPACING.xxxl,
+    paddingBottom: SPACING.md,
     backgroundColor: COLORS.cardBackground,
   },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
+    flexDirection: 'column',
+    gap: SPACING.xs,
   },
   headerTitle: {
-    fontSize: SIZES.text18,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  headerSubtitle: {
     fontSize: SIZES.text14,
+    fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.gray,
-    marginTop: 2,
+    textTransform: 'lowercase',
+  },
+  username: {
+    fontSize: SIZES.text18,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.primaryText,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   scoreSection: {
     alignItems: 'center',

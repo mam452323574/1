@@ -35,6 +35,7 @@ export const SIZES = {
   xl: 24,
   xxl: 32,
   xxxl: 40,
+  text10: 10,
   text12: 12,
   text14: 14,
   text16: 16,

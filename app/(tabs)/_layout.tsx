@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
 import { Home, LineChart, ScanLine } from 'lucide-react-native';
 import { AnimatedTabBarIcon } from '@/components/AnimatedTabBarIcon';
-import { SettingsCog } from '@/components/SettingsCog';
 import { useBadges } from '@/contexts/BadgeContext';
 import { COLORS } from '@/constants/theme';
 
@@ -11,8 +10,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: true,
-        headerRight: () => <SettingsCog />,
+        headerShown: false,
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.gray,
         tabBarStyle: {

@@ -137,6 +137,9 @@ export default function ScannerScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.headerOverlay}>
+        <Text style={styles.headerTitle}>scanner</Text>
+      </View>
       <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
         <CameraGuide scanType={selectedScanType} />
 
@@ -172,6 +175,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: SPACING.xxxl,
+    paddingBottom: SPACING.md,
+    paddingHorizontal: SPACING.page,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  headerTitle: {
+    fontSize: SIZES.text14,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.white,
+    textTransform: 'lowercase',
   },
   permissionContainer: {
     flex: 1,

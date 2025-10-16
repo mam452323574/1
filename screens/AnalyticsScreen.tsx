@@ -112,7 +112,7 @@ export default function AnalyticsScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Analyses</Text>
+        <Text style={styles.headerTitle}>analyses</Text>
       </View>
 
       <View style={styles.periodSelector}>
@@ -188,14 +188,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    padding: SPACING.lg,
-    paddingTop: SPACING.xxl,
+    paddingHorizontal: SPACING.page,
+    paddingTop: SPACING.xxxl,
+    paddingBottom: SPACING.md,
     backgroundColor: COLORS.white,
   },
   headerTitle: {
-    fontSize: SIZES.xxl,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: SIZES.text14,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.gray,
+    textTransform: 'lowercase',
   },
   periodSelector: {
     flexDirection: 'row',
