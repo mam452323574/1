@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Act
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as Updates from 'expo-updates';
 import { Crown, ChevronRight, Shield, LogOut, Bell, ChevronLeft, AlertTriangle, Settings } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
@@ -85,35 +86,25 @@ export default function SettingsScreen() {
             style: 'destructive',
             onPress: async () => {
               try {
-                console.log('[Settings] User confirmed sign out, setting isSigningOut to true');
+                console.log('[Settings] User confirmed sign out');
                 setIsSigningOut(true);
 
                 if (Platform.OS !== 'web') {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                 }
 
-                console.log('[Settings] Calling navigationService.safeSignOut');
-                const result = await navigationService.safeSignOut(signOut);
+                console.log('[Settings] Step 1: Calling signOut to cleanup all data');
+                await signOut();
 
-                if (!result.success) {
-                  console.error('[Settings] Sign out failed:', result.error);
-                  setIsSigningOut(false);
-                  Alert.alert(
-                    'Erreur',
-                    'Une erreur est survenue lors de la déconnexion. Veuillez réessayer.',
-                    [
-                      {
-                        text: 'OK',
-                      },
-                    ]
-                  );
-                }
+                console.log('[Settings] Step 2: Forcing app reload');
+                await Updates.reloadAsync();
+
               } catch (error) {
-                console.error('[Settings] Unexpected sign out error:', error);
+                console.error('[Settings] Sign out error:', error);
                 setIsSigningOut(false);
                 Alert.alert(
                   'Erreur',
-                  'Impossible de se déconnecter. Veuillez vérifier votre connexion.',
+                  'Une erreur est survenue lors de la déconnexion. Veuillez réessayer.',
                   [
                     {
                       text: 'OK',

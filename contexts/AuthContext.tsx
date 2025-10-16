@@ -46,19 +46,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (async () => {
         console.log('[Auth] Auth state changed:', event, session ? 'with session' : 'no session');
 
-        if (event === 'SIGNED_OUT') {
-          console.log('[Auth] User signed out - clearing state');
-          setSession(null);
-          setUser(null);
-          setUserProfile(null);
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await loadUserProfile(session.user.id);
         } else {
-          setSession(session);
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await loadUserProfile(session.user.id);
-          } else {
-            setUserProfile(null);
-          }
+          setUserProfile(null);
         }
       })();
     });
@@ -373,37 +367,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      console.log('[SignOut] Starting sign out process...');
+      console.log('[SignOut] Starting complete cleanup...');
 
+      console.log('[SignOut] Step 1: Clearing local state');
       setUserProfile(null);
       setUser(null);
       setSession(null);
-      console.log('[SignOut] Local state cleared');
 
+      console.log('[SignOut] Step 2: Clearing AsyncStorage');
       try {
         await AsyncStorage.multiRemove([
           'supabase.auth.token',
           '@supabase.auth.token',
         ]);
-        console.log('[SignOut] AsyncStorage cleared');
       } catch (storageError) {
-        console.error('[SignOut] Error clearing AsyncStorage:', storageError);
+        console.error('[SignOut] AsyncStorage cleanup error:', storageError);
       }
 
+      console.log('[SignOut] Step 3: Signing out from Supabase');
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) {
         console.error('[SignOut] Supabase sign out error:', error);
-      } else {
-        console.log('[SignOut] Successfully signed out from Supabase');
+        throw error;
       }
 
-      console.log('[SignOut] Sign out complete');
+      console.log('[SignOut] Complete cleanup finished successfully');
     } catch (error) {
       console.error('[SignOut] Error during sign out:', error);
-
       setUserProfile(null);
       setUser(null);
       setSession(null);
+      throw error;
     }
   };
 
