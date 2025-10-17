@@ -95,11 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('[SignUp] Starting signup process for username:', username);
     console.log('[SignUp] Email:', email);
 
-    const isAvailable = await checkUsernameAvailability(username);
-    if (!isAvailable) {
-      throw new Error('Ce nom d\'utilisateur est déjà pris. Veuillez en choisir un autre.');
-    }
-
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -120,12 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
 
         if (profileError) {
-          if (profileError.code === '23505') {
-            await supabase.auth.admin.deleteUser(data.user.id);
-            if (profileError.message.includes('username')) {
-              throw new Error('Ce nom d\'utilisateur a été pris pendant la création du compte. Veuillez réessayer.');
-            }
-          }
           throw profileError;
         }
 
@@ -331,39 +320,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return !!data;
   };
 
-  const checkUsernameAvailability = async (username: string, retryCount = 0): Promise<boolean> => {
-    if (!username || username.length < 3) return false;
-
-    const maxRetries = 3;
-    const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-    const queryTimeout = 8000;
-
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Query timeout exceeded')), queryTimeout);
-      });
-
-      const queryPromise = supabase
-        .from('user_profiles')
-        .select('username')
-        .eq('username', username)
-        .maybeSingle();
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
-
-      if (error) {
-        throw error;
-      }
-      return !data;
-    } catch (error) {
-      if (retryCount < maxRetries && error instanceof Error &&
-          (error.message.includes('network') || error.message.includes('timeout') || error.message.includes('Query timeout'))) {
-        console.log(`[Username Check] Error, retrying... (${retryCount + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return checkUsernameAvailability(username, retryCount + 1);
-      }
-      throw error;
-    }
+  const checkUsernameAvailability = async (username: string): Promise<boolean> => {
+    return true;
   };
 
   const updateUserProfile = async (updates: Partial<UserProfile>) => {

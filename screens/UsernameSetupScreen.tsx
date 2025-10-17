@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Heart, Check, X, AlertCircle } from 'lucide-react-native';
+import { Heart, Check, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
@@ -9,13 +9,11 @@ import { supabase } from '@/services/supabase';
 
 export default function UsernameSetupScreen() {
   const router = useRouter();
-  const { user, checkUsernameAvailability, updateUserProfile } = useAuth();
+  const { user, updateUserProfile } = useAuth();
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
-  const [checkTimeout, setCheckTimeout] = useState<NodeJS.Timeout | null>(null);
-
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'invalid' | 'valid'>('idle');
   useEffect(() => {
     if (!user) {
       router.replace('/login');
@@ -24,10 +22,6 @@ export default function UsernameSetupScreen() {
   }, [user]);
 
   useEffect(() => {
-    if (checkTimeout) {
-      clearTimeout(checkTimeout);
-    }
-
     if (!username) {
       setUsernameStatus('idle');
       return;
@@ -43,23 +37,7 @@ export default function UsernameSetupScreen() {
       return;
     }
 
-    setUsernameStatus('checking');
-
-    const timeout = setTimeout(async () => {
-      try {
-        const isAvailable = await checkUsernameAvailability(username);
-        setUsernameStatus(isAvailable ? 'available' : 'taken');
-      } catch (error) {
-        console.error('Error checking username:', error);
-        setUsernameStatus('idle');
-      }
-    }, 300);
-
-    setCheckTimeout(timeout);
-
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
+    setUsernameStatus('valid');
   }, [username]);
 
   const validateUsername = (text: string) => {
@@ -78,8 +56,8 @@ export default function UsernameSetupScreen() {
       return;
     }
 
-    if (usernameStatus !== 'available') {
-      setError('Veuillez choisir un nom d\'utilisateur valide et disponible');
+    if (usernameStatus !== 'valid') {
+      setError('Veuillez choisir un nom d\'utilisateur valide');
       return;
     }
 
@@ -153,12 +131,8 @@ export default function UsernameSetupScreen() {
 
   const getUsernameStatusIcon = () => {
     switch (usernameStatus) {
-      case 'checking':
-        return null;
-      case 'available':
+      case 'valid':
         return <Check color={COLORS.success} size={20} />;
-      case 'taken':
-        return <X color={COLORS.error} size={20} />;
       case 'invalid':
         return <AlertCircle color={COLORS.error} size={20} />;
       default:
@@ -168,12 +142,8 @@ export default function UsernameSetupScreen() {
 
   const getUsernameStatusText = () => {
     switch (usernameStatus) {
-      case 'checking':
-        return 'Vérification...';
-      case 'available':
-        return 'Disponible';
-      case 'taken':
-        return 'Déjà pris';
+      case 'valid':
+        return 'Valide';
       case 'invalid':
         return '3-20 caractères, lettres, chiffres, _ ou -';
       default:
@@ -183,9 +153,8 @@ export default function UsernameSetupScreen() {
 
   const getUsernameStatusColor = () => {
     switch (usernameStatus) {
-      case 'available':
+      case 'valid':
         return COLORS.success;
-      case 'taken':
       case 'invalid':
         return COLORS.error;
       default:
@@ -204,7 +173,7 @@ export default function UsernameSetupScreen() {
         <View style={styles.header}>
           <Heart color={COLORS.primary} size={48} fill={COLORS.primary} />
           <Text style={styles.title}>Bienvenue !</Text>
-          <Text style={styles.subtitle}>Choisissez votre nom d'utilisateur</Text>
+          <Text style={styles.subtitle}>Choisissez votre nom d'utilisateur (peut être identique à d'autres)</Text>
         </View>
 
         <View style={styles.form}>
@@ -241,7 +210,7 @@ export default function UsernameSetupScreen() {
             title="Commencer"
             onPress={handleComplete}
             loading={loading}
-            disabled={usernameStatus !== 'available'}
+            disabled={usernameStatus !== 'valid'}
           />
         </View>
       </View>
