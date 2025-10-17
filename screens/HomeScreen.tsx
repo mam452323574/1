@@ -16,6 +16,7 @@ import { ScanLimitIndicator } from '@/components/ScanLimitIndicator';
 import { FadeInView } from '@/components/FadeInView';
 import { SettingsCog } from '@/components/SettingsCog';
 import { NotificationBell } from '@/components/NotificationBell';
+import { LogoutButton } from '@/components/LogoutButton';
 import { SCAN_TYPE_LABELS } from '@/constants/scan';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
 
@@ -81,6 +82,7 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerRight}>
           <NotificationBell />
+          <LogoutButton />
           <SettingsCog />
         </View>
       </View>
