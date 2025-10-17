@@ -147,6 +147,9 @@ export default function SignUpScreen() {
       }
 
       await signUp(email, password, username, avatarUrl || undefined);
+
+      console.log('[SignUp] Inscription réussie, redirection vers l\'application');
+      router.replace('/(tabs)');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l\'inscription');
     } finally {

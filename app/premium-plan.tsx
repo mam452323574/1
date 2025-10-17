@@ -42,81 +42,84 @@ export default function PremiumPlanScreen() {
   return (
     <View style={styles.container}>
       <ModalHandle />
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => router.back()}
-          activeOpacity={0.8}
-        >
-          <X color={COLORS.primaryText} size={24} />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <View style={styles.crownContainer}>
-            <Crown color={COLORS.primary} size={48} fill={COLORS.primary} />
-            <View style={styles.sparkle}>
-              <Sparkles color={COLORS.primary} size={20} fill={COLORS.primary} />
-            </View>
-          </View>
-          <Text style={styles.title}>
-            {isPremium ? 'Votre Plan Premium' : 'Passez à Premium'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isPremium
-              ? 'Profitez de tous les avantages premium'
-              : 'Débloquez tout le potentiel de Health Scan'}
-          </Text>
-        </View>
-      </View>
-
-      {!isPremium && (
-        <View style={styles.pricingCard}>
-          <View style={styles.pricingHeader}>
-            <Text style={styles.price}>9,99 €</Text>
-            <Text style={styles.pricePeriod}>/mois</Text>
-          </View>
-          <Text style={styles.pricingSubtext}>Annulez à tout moment</Text>
-        </View>
-      )}
-
       <ScrollView
-        style={styles.comparisonSection}
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.comparisonTitle}>Comparer les plans</Text>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : (
-          <FeatureComparisonList features={features} />
-        )}
-        <View style={styles.bottomSpacing} />
-      </ScrollView>
-
-      {!isPremium && (
-        <View style={styles.footer}>
-          <Button
-            title="Passer à Premium"
-            onPress={() => router.push('/premium-upgrade')}
-          />
+        <View style={styles.header}>
           <TouchableOpacity
-            style={styles.laterButton}
+            style={styles.closeButton}
             onPress={() => router.back()}
             activeOpacity={0.8}
           >
-            <Text style={styles.laterButtonText}>Plus tard</Text>
+            <X color={COLORS.primaryText} size={24} />
           </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <View style={styles.crownContainer}>
+              <Crown color={COLORS.primary} size={48} fill={COLORS.primary} />
+              <View style={styles.sparkle}>
+                <Sparkles color={COLORS.primary} size={20} fill={COLORS.primary} />
+              </View>
+            </View>
+            <Text style={styles.title}>
+              {isPremium ? 'Votre Plan Premium' : 'Passez à Premium'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isPremium
+                ? 'Profitez de tous les avantages premium'
+                : 'Débloquez tout le potentiel de Health Scan'}
+            </Text>
+          </View>
         </View>
-      )}
 
-      {isPremium && (
-        <View style={styles.footer}>
-          <Button
-            title="Retour"
-            onPress={() => router.back()}
-          />
+        {!isPremium && (
+          <View style={styles.pricingCard}>
+            <View style={styles.pricingHeader}>
+              <Text style={styles.price}>9,99 €</Text>
+              <Text style={styles.pricePeriod}>/mois</Text>
+            </View>
+            <Text style={styles.pricingSubtext}>Annulez à tout moment</Text>
+          </View>
+        )}
+
+        <View style={styles.comparisonSection}>
+          <Text style={styles.comparisonTitle}>Comparer les plans</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+          ) : (
+            <FeatureComparisonList features={features} />
+          )}
         </View>
-      )}
+
+        {!isPremium && (
+          <View style={styles.footerContent}>
+            <Button
+              title="Passer à Premium"
+              onPress={() => router.push('/premium-upgrade')}
+            />
+            <TouchableOpacity
+              style={styles.laterButton}
+              onPress={() => router.back()}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.laterButtonText}>Plus tard</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isPremium && (
+          <View style={styles.footerContent}>
+            <Button
+              title="Retour"
+              onPress={() => router.back()}
+            />
+          </View>
+        )}
+
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
     </View>
   );
 }
@@ -125,6 +128,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  scrollView: {
+    flex: 1,
   },
   header: {
     backgroundColor: COLORS.white,
@@ -193,7 +199,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   comparisonSection: {
-    flex: 1,
     marginTop: SPACING.lg,
     paddingHorizontal: SPACING.page,
   },
@@ -208,16 +213,14 @@ const styles = StyleSheet.create({
     height: SPACING.xxxl,
   },
   loadingContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SPACING.xxxl,
   },
-  footer: {
+  footerContent: {
     padding: SPACING.page,
     backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
+    marginTop: SPACING.lg,
   },
   laterButton: {
     alignItems: 'center',

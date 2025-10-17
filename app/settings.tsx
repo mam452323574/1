@@ -2,19 +2,16 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Act
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Crown, ChevronRight, Shield, LogOut, Bell, ChevronLeft, AlertTriangle, Settings } from 'lucide-react-native';
+import { Crown, ChevronRight, Shield, LogOut, ChevronLeft, AlertTriangle, Settings } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotificationContext } from '@/contexts/NotificationContext';
 import { AccountBadge } from '@/components/AccountBadge';
 import { Button } from '@/components/Button';
 import { ModalHandle } from '@/components/ModalHandle';
-import { navigationService } from '@/services/navigation';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { userProfile, signOut } = useAuth();
-  const { notificationCount } = useNotificationContext();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
@@ -41,13 +38,6 @@ export default function SettingsScreen() {
     }
   }, [isSigningOut]);
 
-  const handleNotificationsPress = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    navigationService.navigateToNotifications();
-  };
-
   const handleNotificationSettingsPress = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -70,18 +60,18 @@ export default function SettingsScreen() {
 
       console.log('[Settings] Showing sign out confirmation dialog');
       Alert.alert(
-        '⚠️ Déconnexion',
-        'Êtes-vous sûr de vouloir vous déconnecter ?\n\nVos données seront sauvegardées et vous pourrez vous reconnecter à tout moment.',
+        'Déconnexion',
+        'Voulez-vous vous déconnecter ?',
         [
           {
-            text: 'Annuler',
+            text: 'Non',
             style: 'cancel',
             onPress: () => {
               console.log('[Settings] Sign out cancelled by user');
             },
           },
           {
-            text: 'Se Déconnecter',
+            text: 'Oui',
             style: 'destructive',
             onPress: async () => {
               try {
@@ -181,31 +171,6 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Préférences</Text>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={handleNotificationsPress}
-          activeOpacity={0.7}
-        >
-          <View style={styles.menuItemLeft}>
-            <Bell color={COLORS.primaryText} size={20} />
-            <View>
-              <Text style={styles.menuItemText}>Notifications</Text>
-              {notificationCount > 0 && (
-                <Text style={styles.menuItemSubtext}>
-                  {notificationCount} nouvelle{notificationCount > 1 ? 's' : ''}
-                </Text>
-              )}
-            </View>
-          </View>
-          <View style={styles.menuItemRight}>
-            {notificationCount > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>{notificationCount}</Text>
-              </View>
-            )}
-            <ChevronRight color={COLORS.gray} size={20} />
-          </View>
-        </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={handleNotificationSettingsPress}
