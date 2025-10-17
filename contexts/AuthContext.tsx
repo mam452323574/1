@@ -15,7 +15,7 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, username: string, avatarUrl?: string) => Promise<void>;
+  signUp: (email: string, password: string, username: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
   signOut: () => Promise<void>;
   checkUsernameAvailability: (username: string) => Promise<boolean>;
@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   };
 
-  const signUp = async (email: string, password: string, username: string, avatarUrl?: string) => {
+  const signUp = async (email: string, password: string, username: string) => {
     console.log('[SignUp] Starting signup process for username:', username);
 
     const isAvailable = await checkUsernameAvailability(username);
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             id: data.user.id,
             email: data.user.email!,
             username,
-            avatar_url: avatarUrl || null,
+            avatar_url: null,
             account_tier: 'free',
           });
 
@@ -253,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: user.id,
           email: email,
           username: null,
-          avatar_url: user.user_metadata?.avatar_url || null,
+          avatar_url: null,
           account_tier: 'free',
         });
 

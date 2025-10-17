@@ -144,7 +144,7 @@ export default function SignUpScreen() {
         return;
       }
 
-      await signUp(email, password, username, undefined);
+      await signUp(email, password, username);
 
       console.log('[SignUp] Inscription réussie, redirection vers l\'application');
       router.replace('/(tabs)');

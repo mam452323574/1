@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { Heart, Check, X, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
-import { AvatarPicker } from '@/components/AvatarPicker';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 import { supabase } from '@/services/supabase';
 
@@ -12,7 +11,6 @@ export default function UsernameSetupScreen() {
   const router = useRouter();
   const { user, checkUsernameAvailability, updateUserProfile } = useAuth();
   const [username, setUsername] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
@@ -22,10 +20,6 @@ export default function UsernameSetupScreen() {
     if (!user) {
       router.replace('/login');
       return;
-    }
-
-    if (user.user_metadata?.avatar_url) {
-      setAvatarUrl(user.user_metadata.avatar_url);
     }
   }, [user]);
 
@@ -95,11 +89,9 @@ export default function UsernameSetupScreen() {
 
       console.log('[UsernameSetup] Starting profile completion for user:', user.id);
       console.log('[UsernameSetup] Username:', username);
-      console.log('[UsernameSetup] Avatar URL:', avatarUrl);
 
       await updateUserProfile({
         username,
-        avatar_url: avatarUrl,
       });
       console.log('[UsernameSetup] Profile updated successfully');
 
@@ -212,17 +204,7 @@ export default function UsernameSetupScreen() {
         <View style={styles.header}>
           <Heart color={COLORS.primary} size={48} fill={COLORS.primary} />
           <Text style={styles.title}>Bienvenue !</Text>
-          <Text style={styles.subtitle}>Configurez votre profil</Text>
-        </View>
-
-        <View style={styles.avatarSection}>
-          <AvatarPicker
-            userId={user.id}
-            currentAvatarUrl={avatarUrl}
-            onAvatarSelected={setAvatarUrl}
-            size={100}
-          />
-          <Text style={styles.avatarHint}>Optionnel</Text>
+          <Text style={styles.subtitle}>Choisissez votre nom d'utilisateur</Text>
         </View>
 
         <View style={styles.form}>
@@ -279,7 +261,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.xxl,
   },
   title: {
     fontSize: SIZES.xxxl,
@@ -291,15 +273,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.md,
     color: COLORS.gray,
     marginTop: SPACING.sm,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  avatarHint: {
-    fontSize: SIZES.sm,
-    color: COLORS.gray,
-    marginTop: SPACING.xs,
   },
   form: {
     width: '100%',
