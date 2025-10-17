@@ -100,22 +100,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Ce nom d\'utilisateur est déjà pris. Veuillez en choisir un autre.');
     }
 
-    const { data: existingEmailProfile, error: emailCheckError } = await supabase
-      .rpc('find_user_by_email', { p_email: email });
-
-    if (emailCheckError) {
-      console.error('[SignUp] Error checking for existing email:', emailCheckError);
-    }
-
-    if (existingEmailProfile && existingEmailProfile.length > 0) {
-      const existingUser = existingEmailProfile[0];
-      console.log('[SignUp] Found existing account with this email');
-      console.log('[SignUp] Existing user ID:', existingUser.user_id);
-      console.log('[SignUp] Existing username:', existingUser.username);
-
-      throw new Error('Un compte existe déjà avec cet email. Veuillez vous connecter ou utiliser un autre email.');
-    }
-
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -140,8 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await supabase.auth.admin.deleteUser(data.user.id);
             if (profileError.message.includes('username')) {
               throw new Error('Ce nom d\'utilisateur a été pris pendant la création du compte. Veuillez réessayer.');
-            } else if (profileError.message.includes('email')) {
-              throw new Error('Un compte existe déjà avec cet email. Veuillez vous connecter.');
             }
           }
           throw profileError;
@@ -280,49 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      console.log('[OAuth] No profile found for auth user, checking for existing email-based account');
-
-      const { data: emailBasedProfile, error: emailCheckError } = await supabase
-        .rpc('find_user_by_email', { p_email: email });
-
-      if (emailCheckError) {
-        console.error('[OAuth] Error checking for existing email:', emailCheckError);
-      }
-
-      if (emailBasedProfile && emailBasedProfile.length > 0) {
-        const existingUser = emailBasedProfile[0];
-        console.log('[OAuth] Found existing account with this email!');
-        console.log('[OAuth] Existing user ID:', existingUser.user_id);
-        console.log('[OAuth] Existing username:', existingUser.username);
-        console.log('[OAuth] Linking OAuth provider to existing account...');
-
-        const { data: linkResult, error: linkError } = await supabase
-          .rpc('link_oauth_to_existing_user', {
-            p_user_id: existingUser.user_id,
-            p_provider: provider,
-            p_provider_user_id: user.user_metadata?.sub || user.id,
-            p_provider_email: email,
-            p_metadata: user.user_metadata || {}
-          });
-
-        if (linkError) {
-          console.error('[OAuth] Error linking OAuth to existing account:', linkError);
-          throw new Error('Failed to link OAuth provider to existing account');
-        }
-
-        if (linkResult && linkResult.length > 0 && linkResult[0].success) {
-          console.log('[OAuth] Successfully linked OAuth provider to existing account');
-          console.log('[OAuth] Preserved username:', existingUser.username);
-
-          await loadUserProfile(existingUser.user_id);
-          return;
-        } else {
-          console.error('[OAuth] Failed to link OAuth provider:', linkResult);
-          throw new Error('Failed to link OAuth provider to existing account');
-        }
-      }
-
-      console.log('[OAuth] No existing account found, creating new user profile');
+      console.log('[OAuth] No profile found for auth user, creating new user profile');
 
       const isDisposable = await checkDisposableEmail(email);
 
