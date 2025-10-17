@@ -185,6 +185,21 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Sécurité</Text>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push('/trusted-devices')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.menuItemLeft}>
+            <Shield color={COLORS.primaryText} size={20} />
+            <Text style={styles.menuItemText}>Appareils de confiance</Text>
+          </View>
+          <ChevronRight color={COLORS.gray} size={20} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Application</Text>
         <TouchableOpacity
           style={styles.menuItem}

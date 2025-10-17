@@ -4,8 +4,10 @@ import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { supabase } from '@/services/supabase';
-import { UserProfile, OAuthProvider } from '@/types';
+import { UserProfile, OAuthProvider, SendVerificationCodeResponse, VerificationResult } from '@/types';
+import { getDeviceInfo } from '@/utils/deviceIdentifier';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -14,7 +16,7 @@ interface AuthContextType {
   session: Session | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ needsVerification: boolean; isOAuth: boolean }>;
   signUp: (email: string, password: string, username: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
   signOut: () => Promise<void>;
@@ -22,6 +24,11 @@ interface AuthContextType {
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
   isDisposableEmail: (email: string) => Promise<boolean>;
+  sendVerificationCode: (email: string) => Promise<SendVerificationCodeResponse>;
+  verifyEmailCode: (code: string, trustDevice: boolean) => Promise<void>;
+  isDeviceTrusted: () => Promise<boolean>;
+  getTrustedDevices: () => Promise<any[]>;
+  removeTrustedDevice: (deviceId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -83,12 +90,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
+
+    if (!data.user) {
+      throw new Error('Login failed');
+    }
+
+    const { data: connections } = await supabase
+      .from('oauth_connections')
+      .select('provider')
+      .eq('user_id', data.user.id);
+
+    const isEmailProvider = connections?.some(conn => conn.provider === 'email');
+    const isOAuthProvider = connections?.some(conn => conn.provider === 'google' || conn.provider === 'apple');
+
+    if (isOAuthProvider && !isEmailProvider) {
+      console.log('[SignIn] OAuth user, skipping verification');
+      return { needsVerification: false, isOAuth: true };
+    }
+
+    const deviceTrusted = await checkIfDeviceTrusted(data.user.id);
+
+    if (deviceTrusted) {
+      console.log('[SignIn] Device is trusted, updating last used time');
+      const deviceInfo = await getDeviceInfo();
+      await supabase
+        .from('trusted_devices')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('user_id', data.user.id)
+        .eq('device_identifier', deviceInfo.device_identifier);
+
+      return { needsVerification: false, isOAuth: false };
+    }
+
+    await supabase.auth.signOut({ scope: 'local' });
+    setUser(null);
+    setSession(null);
+
+    console.log('[SignIn] Device not trusted, verification required');
+    return { needsVerification: true, isOAuth: false };
   };
 
   const signUp = async (email: string, password: string, username: string) => {
@@ -401,6 +446,123 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return !!data;
   };
 
+  const sendVerificationCode = async (email: string): Promise<SendVerificationCodeResponse> => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      const { data: tempSession, error: tempAuthError } = await supabase.auth.signInWithPassword({
+        email,
+        password: 'temp',
+      });
+
+      if (tempAuthError) {
+        throw new Error('Authentication required to send verification code');
+      }
+    }
+
+    const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/send-verification-email`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${currentSession?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to send verification code');
+    }
+
+    return result;
+  };
+
+  const verifyEmailCode = async (code: string, trustDevice: boolean) => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      throw new Error('Session required for verification');
+    }
+
+    const { data: result, error } = await supabase.rpc('verify_email_code', {
+      p_user_id: session.user.id,
+      p_code: code,
+    });
+
+    if (error || !result?.success) {
+      throw new Error(result?.error || 'Invalid verification code');
+    }
+
+    if (trustDevice) {
+      const deviceInfo = await getDeviceInfo();
+      const trustedUntil = new Date();
+      trustedUntil.setDate(trustedUntil.getDate() + 30);
+
+      await supabase.from('trusted_devices').insert({
+        user_id: session.user.id,
+        device_identifier: deviceInfo.device_identifier,
+        device_name: deviceInfo.device_name,
+        platform: deviceInfo.platform,
+        trusted_until: trustedUntil.toISOString(),
+      });
+    }
+
+    await loadUserProfile(session.user.id);
+  };
+
+  const checkIfDeviceTrusted = async (userId: string): Promise<boolean> => {
+    const deviceInfo = await getDeviceInfo();
+
+    const { data } = await supabase
+      .from('trusted_devices')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('device_identifier', deviceInfo.device_identifier)
+      .gt('trusted_until', new Date().toISOString())
+      .maybeSingle();
+
+    return !!data;
+  };
+
+  const isDeviceTrusted = async (): Promise<boolean> => {
+    if (!user) return false;
+    return await checkIfDeviceTrusted(user.id);
+  };
+
+  const getTrustedDevices = async () => {
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('trusted_devices')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('last_used_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  };
+
+  const removeTrustedDevice = async (deviceId: string) => {
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('trusted_devices')
+      .delete()
+      .eq('id', deviceId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+  };
+
   const signOut = async () => {
     try {
       console.log('[SignOut] Starting complete cleanup...');
@@ -451,6 +613,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUserProfile,
       refreshUserProfile,
       isDisposableEmail,
+      sendVerificationCode,
+      verifyEmailCode,
+      isDeviceTrusted,
+      getTrustedDevices,
+      removeTrustedDevice,
     }}>
       {children}
     </AuthContext.Provider>

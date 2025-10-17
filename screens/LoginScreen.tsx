@@ -9,7 +9,7 @@ import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, signInWithOAuth } = useAuth();
+  const { signIn, signInWithOAuth, sendVerificationCode, verifyEmailCode } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +25,24 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       setError(null);
-      await signIn(email, password);
+      const result = await signIn(email, password);
+
+      if (result.needsVerification) {
+        await sendVerificationCode(email);
+        router.push({
+          pathname: '/email-verification',
+          params: {
+            email,
+            onVerify: async (code: string, trustDevice: boolean) => {
+              await verifyEmailCode(code, trustDevice);
+              router.replace('/(tabs)');
+            },
+            onResend: async () => {
+              await sendVerificationCode(email);
+            },
+          },
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de connexion');
     } finally {

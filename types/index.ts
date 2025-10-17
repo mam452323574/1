@@ -159,3 +159,45 @@ export interface ScanLimitConfig {
   periodMs: number;
   label: string;
 }
+
+export interface VerificationCode {
+  id: string;
+  user_id: string;
+  email: string;
+  code: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+}
+
+export interface TrustedDevice {
+  id: string;
+  user_id: string;
+  device_identifier: string;
+  device_name: string | null;
+  platform: string;
+  trusted_until: string;
+  last_used_at: string;
+  created_at: string;
+}
+
+export interface DeviceInfo {
+  device_identifier: string;
+  device_name: string;
+  platform: 'ios' | 'android' | 'web';
+}
+
+export interface VerificationResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  expires_at?: string;
+  code?: string;
+}
+
+export interface SendVerificationCodeResponse {
+  success: boolean;
+  message: string;
+  expires_at?: string;
+  error?: string;
+}
