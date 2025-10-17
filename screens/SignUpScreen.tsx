@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { Heart, Check, X, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
-import { AvatarPicker } from '@/components/AvatarPicker';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 
 export default function SignUpScreen() {
@@ -14,7 +13,6 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'network_error' | 'timeout'>('idle');
@@ -146,7 +144,7 @@ export default function SignUpScreen() {
         return;
       }
 
-      await signUp(email, password, username, avatarUrl || undefined);
+      await signUp(email, password, username, undefined);
 
       console.log('[SignUp] Inscription réussie, redirection vers l\'application');
       router.replace('/(tabs)');
@@ -223,16 +221,6 @@ export default function SignUpScreen() {
           <Text style={styles.title}>Health Scan</Text>
           <Text style={styles.subtitle}>Créez votre compte</Text>
         </View>
-
-          <View style={styles.avatarSection}>
-            <AvatarPicker
-              userId="temp"
-              currentAvatarUrl={avatarUrl}
-              onAvatarSelected={setAvatarUrl}
-              size={100}
-            />
-            <Text style={styles.avatarHint}>Optionnel</Text>
-          </View>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
@@ -377,15 +365,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.md,
     color: COLORS.gray,
     marginTop: SPACING.sm,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  avatarHint: {
-    fontSize: SIZES.sm,
-    color: COLORS.gray,
-    marginTop: SPACING.xs,
   },
   form: {
     width: '100%',
