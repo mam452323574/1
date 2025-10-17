@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Heart, Mail, Clock } from 'lucide-react-native';
 import { Button } from '@/components/Button';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EmailVerificationScreenProps {
   email: string;
@@ -13,8 +14,8 @@ interface EmailVerificationScreenProps {
 
 export default function EmailVerificationScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const email = params.email as string;
+  const { pendingVerification, verifyEmailCode, sendVerificationCode, cancelVerification } = useAuth();
+  const email = pendingVerification?.email;
 
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [trustDevice, setTrustDevice] = useState(true);
@@ -22,6 +23,13 @@ export default function EmailVerificationScreen() {
   const [error, setError] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(15 * 60);
+
+  useEffect(() => {
+    if (!pendingVerification) {
+      console.log('[EmailVerification] No pending verification, redirecting to login');
+      router.replace('/login');
+    }
+  }, [pendingVerification]);
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
@@ -87,9 +95,9 @@ export default function EmailVerificationScreen() {
       setLoading(true);
       setError(null);
 
-      if (params.onVerify) {
-        await (params.onVerify as any)(finalCode, trustDevice);
-      }
+      await verifyEmailCode(finalCode, trustDevice);
+      console.log('[EmailVerification] Verification successful, redirecting to tabs');
+      router.replace('/(tabs)');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Code de vérification invalide');
       setCode(['', '', '', '', '', '']);
@@ -100,13 +108,11 @@ export default function EmailVerificationScreen() {
   };
 
   const handleResend = async () => {
-    if (resendCooldown > 0) return;
+    if (resendCooldown > 0 || !email) return;
 
     try {
       setError(null);
-      if (params.onResend) {
-        await (params.onResend as any)();
-      }
+      await sendVerificationCode(email);
       setResendCooldown(60);
       setTimeRemaining(15 * 60);
     } catch (err) {
@@ -133,7 +139,7 @@ export default function EmailVerificationScreen() {
             <Text style={styles.subtitle}>
               Nous avons envoyé un code de vérification à
             </Text>
-            <Text style={styles.email}>{email}</Text>
+            <Text style={styles.email}>{email || 'votre email'}</Text>
           </View>
 
           <View style={styles.timerContainer}>
@@ -211,10 +217,13 @@ export default function EmailVerificationScreen() {
 
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={async () => {
+              await cancelVerification();
+              router.replace('/login');
+            }}
             disabled={loading}
           >
-            <Text style={styles.backButtonText}>Retour à la connexion</Text>
+            <Text style={styles.backButtonText}>Annuler et retourner à la connexion</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

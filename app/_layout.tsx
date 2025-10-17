@@ -11,7 +11,7 @@ import { Button } from '@/components/Button';
 import { COLORS, SPACING, SIZES } from '@/constants/theme';
 
 function RootLayoutNav() {
-  const { user, userProfile, loading, signOut } = useAuth();
+  const { user, userProfile, loading, pendingVerification, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const [redirectCount, setRedirectCount] = useState(0);
@@ -30,11 +30,11 @@ function RootLayoutNav() {
     const now = Date.now();
     const timeSinceLastRedirect = now - lastRedirectTime.current;
 
-    if (timeSinceLastRedirect < 1000 && !inAuthGroup && !inLogin) {
+    if (timeSinceLastRedirect < 1000 && !inAuthGroup && !inLogin && !inEmailVerification) {
       console.warn('[Navigation] Rapid redirect detected, incrementing counter');
       setRedirectCount(prev => prev + 1);
     } else {
-      if ((inAuthGroup || inLogin) && redirectCount > 0) {
+      if ((inAuthGroup || inLogin || inEmailVerification) && redirectCount > 0) {
         console.log('[Navigation] User reached stable state, resetting counter');
         setRedirectCount(0);
         setLoopDetected(false);
@@ -71,11 +71,16 @@ function RootLayoutNav() {
       return;
     }
 
+    if (pendingVerification && !inEmailVerification) {
+      console.log('[Navigation] Pending verification detected, staying on verification flow');
+      return;
+    }
+
     if (!user && !inLogin && !inEmailVerification) {
       console.log('[Navigation] No user detected, redirecting to login');
       lastRedirectTime.current = now;
       router.replace('/login');
-    } else if (user && !userProfile?.username && !inUsernameSetup) {
+    } else if (user && !userProfile?.username && !inUsernameSetup && !pendingVerification) {
       console.log('[Navigation] User missing username, redirecting to setup');
       console.log('[Navigation] User ID:', user.id);
       console.log('[Navigation] User Profile:', userProfile);
@@ -86,7 +91,7 @@ function RootLayoutNav() {
       lastRedirectTime.current = now;
       router.replace('/(tabs)');
     }
-  }, [user, userProfile, loading, segments, redirectCount]);
+  }, [user, userProfile, loading, segments, redirectCount, pendingVerification]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

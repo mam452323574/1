@@ -28,20 +28,9 @@ export default function LoginScreen() {
       const result = await signIn(email, password);
 
       if (result.needsVerification) {
+        console.log('[Login] Verification required, sending code and navigating to verification screen');
         await sendVerificationCode(email);
-        router.push({
-          pathname: '/email-verification',
-          params: {
-            email,
-            onVerify: async (code: string, trustDevice: boolean) => {
-              await verifyEmailCode(code, trustDevice);
-              router.replace('/(tabs)');
-            },
-            onResend: async () => {
-              await sendVerificationCode(email);
-            },
-          },
-        });
+        router.push('/email-verification');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de connexion');

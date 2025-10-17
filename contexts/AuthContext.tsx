@@ -16,6 +16,7 @@ interface AuthContextType {
   session: Session | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  pendingVerification: { email: string; userId: string } | null;
   signIn: (email: string, password: string) => Promise<{ needsVerification: boolean; isOAuth: boolean }>;
   signUp: (email: string, password: string, username: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
@@ -29,6 +30,7 @@ interface AuthContextType {
   isDeviceTrusted: () => Promise<boolean>;
   getTrustedDevices: () => Promise<any[]>;
   removeTrustedDevice: (deviceId: string) => Promise<void>;
+  cancelVerification: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingVerification, setPendingVerification] = useState<{ email: string; userId: string } | null>(null);
 
   useEffect(() => {
     console.log('[AuthProvider] Initializing authentication...');
@@ -128,11 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { needsVerification: false, isOAuth: false };
     }
 
-    await supabase.auth.signOut({ scope: 'local' });
-    setUser(null);
-    setSession(null);
-
     console.log('[SignIn] Device not trusted, verification required');
+    console.log('[SignIn] Keeping session active for verification process');
+    setPendingVerification({ email, userId: data.user.id });
     return { needsVerification: true, isOAuth: false };
   };
 
@@ -516,6 +517,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    console.log('[VerifyEmail] Verification successful, clearing pending state');
+    setPendingVerification(null);
     await loadUserProfile(session.user.id);
   };
 
@@ -563,6 +566,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   };
 
+  const cancelVerification = async () => {
+    console.log('[CancelVerification] User cancelled verification process');
+    setPendingVerification(null);
+    await supabase.auth.signOut({ scope: 'local' });
+    setUser(null);
+    setSession(null);
+    setUserProfile(null);
+  };
+
   const signOut = async () => {
     try {
       console.log('[SignOut] Starting complete cleanup...');
@@ -571,6 +583,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserProfile(null);
       setUser(null);
       setSession(null);
+      setPendingVerification(null);
 
       console.log('[SignOut] Step 2: Clearing AsyncStorage');
       try {
@@ -595,6 +608,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserProfile(null);
       setUser(null);
       setSession(null);
+      setPendingVerification(null);
       throw error;
     }
   };
@@ -605,6 +619,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       userProfile,
       loading,
+      pendingVerification,
       signIn,
       signUp,
       signInWithOAuth,
@@ -618,6 +633,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isDeviceTrusted,
       getTrustedDevices,
       removeTrustedDevice,
+      cancelVerification,
     }}>
       {children}
     </AuthContext.Provider>
