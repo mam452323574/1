@@ -121,12 +121,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (deviceTrusted) {
       console.log('[SignIn] Device is trusted, updating last used time');
-      const deviceInfo = await getDeviceInfo();
-      await supabase
-        .from('trusted_devices')
-        .update({ last_used_at: new Date().toISOString() })
-        .eq('user_id', data.user.id)
-        .eq('device_identifier', deviceInfo.device_identifier);
+      try {
+        const deviceInfo = await getDeviceInfo();
+        const { error: updateError } = await supabase
+          .from('trusted_devices')
+          .update({ last_used_at: new Date().toISOString() })
+          .eq('user_id', data.user.id)
+          .eq('device_identifier', deviceInfo.device_identifier);
+
+        if (updateError) {
+          console.error('[SignIn] Error updating device last_used_at:', updateError);
+        }
+      } catch (error) {
+        console.error('[SignIn] Exception updating device:', error);
+      }
 
       return { needsVerification: false, isOAuth: false };
     }
@@ -503,37 +511,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(result?.error || 'Invalid verification code');
     }
 
-    if (trustDevice) {
-      const deviceInfo = await getDeviceInfo();
-      const trustedUntil = new Date();
-      trustedUntil.setDate(trustedUntil.getDate() + 30);
+    await loadUserProfile(session.user.id);
 
-      await supabase.from('trusted_devices').insert({
-        user_id: session.user.id,
-        device_identifier: deviceInfo.device_identifier,
-        device_name: deviceInfo.device_name,
-        platform: deviceInfo.platform,
-        trusted_until: trustedUntil.toISOString(),
-      });
+    if (trustDevice) {
+      try {
+        console.log('[VerifyEmail] Adding trusted device');
+        const deviceInfo = await getDeviceInfo();
+        const now = new Date().toISOString();
+        const trustedUntil = new Date();
+        trustedUntil.setDate(trustedUntil.getDate() + 30);
+
+        const { error: deviceError } = await supabase
+          .from('trusted_devices')
+          .upsert({
+            user_id: session.user.id,
+            device_identifier: deviceInfo.device_identifier,
+            device_name: deviceInfo.device_name,
+            platform: deviceInfo.platform,
+            trusted_until: trustedUntil.toISOString(),
+            last_used_at: now,
+            created_at: now,
+          }, {
+            onConflict: 'user_id,device_identifier',
+            ignoreDuplicates: false,
+          });
+
+        if (deviceError) {
+          console.error('[VerifyEmail] Error adding trusted device:', deviceError);
+        } else {
+          console.log('[VerifyEmail] Trusted device added successfully');
+        }
+      } catch (deviceError) {
+        console.error('[VerifyEmail] Exception adding trusted device:', deviceError);
+      }
     }
 
     console.log('[VerifyEmail] Verification successful, clearing pending state');
     setPendingVerification(null);
-    await loadUserProfile(session.user.id);
   };
 
   const checkIfDeviceTrusted = async (userId: string): Promise<boolean> => {
-    const deviceInfo = await getDeviceInfo();
+    try {
+      const deviceInfo = await getDeviceInfo();
+      const now = new Date().toISOString();
 
-    const { data } = await supabase
-      .from('trusted_devices')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('device_identifier', deviceInfo.device_identifier)
-      .gt('trusted_until', new Date().toISOString())
-      .maybeSingle();
+      const { data, error } = await supabase
+        .from('trusted_devices')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('device_identifier', deviceInfo.device_identifier)
+        .gt('trusted_until', now)
+        .maybeSingle();
 
-    return !!data;
+      if (error) {
+        console.error('[CheckDeviceTrust] Error checking device:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('[CheckDeviceTrust] Exception checking device:', error);
+      return false;
+    }
   };
 
   const isDeviceTrusted = async (): Promise<boolean> => {
@@ -544,6 +583,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const getTrustedDevices = async () => {
     if (!user) return [];
 
+    try {
+      await cleanupExpiredDevices();
+    } catch (error) {
+      console.error('[GetTrustedDevices] Error cleaning up expired devices:', error);
+    }
+
     const { data, error } = await supabase
       .from('trusted_devices')
       .select('*')
@@ -552,6 +597,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) throw error;
     return data || [];
+  };
+
+  const cleanupExpiredDevices = async () => {
+    if (!user) return;
+
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('trusted_devices')
+        .delete()
+        .eq('user_id', user.id)
+        .lt('trusted_until', now);
+
+      if (error) {
+        console.error('[CleanupDevices] Error deleting expired devices:', error);
+      } else {
+        console.log('[CleanupDevices] Expired devices cleaned up');
+      }
+    } catch (error) {
+      console.error('[CleanupDevices] Exception during cleanup:', error);
+    }
   };
 
   const removeTrustedDevice = async (deviceId: string) => {
