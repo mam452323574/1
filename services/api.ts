@@ -381,9 +381,10 @@ export class ApiService {
 
     const { data: scans, error } = await supabase
       .from('scans')
-      .select('created_at')
+      .select('created_at, analysis_result')
       .eq('user_id', user.id)
       .eq('scan_type', 'nutrition')
+      .not('analysis_result', 'is', null)
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true });
 
@@ -394,9 +395,32 @@ export class ApiService {
     }
 
     console.log('[ApiService] Nutrition scans fetched:', scans?.length || 0, 'records');
-    console.warn('[ApiService] analysis_result column not available yet - returning empty data points');
 
     const dataPoints: NutritionHistoryDataPoint[] = [];
+
+    if (scans && scans.length > 0) {
+      for (const scan of scans) {
+        try {
+          const analysisResult = scan.analysis_result as any;
+
+          if (analysisResult && analysisResult.totals) {
+            const date = new Date(scan.created_at).toISOString().split('T')[0];
+
+            dataPoints.push({
+              date,
+              kcal: analysisResult.totals.kcal || 0,
+              protein_g: analysisResult.totals.protein_g || 0,
+              carb_g: analysisResult.totals.carb_g || 0,
+              fat_g: analysisResult.totals.fat_g || 0,
+            });
+          }
+        } catch (err) {
+          console.warn('[ApiService] Error parsing scan analysis_result:', err);
+        }
+      }
+    }
+
+    console.log('[ApiService] Extracted data points:', dataPoints.length);
 
     const aggregatedData = dataPoints.reduce((acc, point) => {
       const existing = acc.find(d => d.date === point.date);
@@ -410,6 +434,8 @@ export class ApiService {
       }
       return acc;
     }, [] as NutritionHistoryDataPoint[]);
+
+    console.log('[ApiService] Aggregated data points:', aggregatedData.length);
 
     return aggregatedData;
   }

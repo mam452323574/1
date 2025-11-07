@@ -66,6 +66,18 @@ function formatTimeRemaining(milliseconds: number): string {
   }
 }
 
+function formatAbsoluteDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const options: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  };
+  return date.toLocaleString('fr-FR', options);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -128,8 +140,9 @@ Deno.serve(async (req: Request) => {
       const nextAvailableDate = new Date(oldestTimestamp).getTime() + limit.periodMs;
       const timeRemaining = nextAvailableDate - now;
       const formattedTime = formatTimeRemaining(timeRemaining);
+      const absoluteDate = formatAbsoluteDate(nextAvailableDate);
 
-      const message = `${SCAN_MESSAGES[accountTier][scanType]}. Prochain scan disponible dans ${formattedTime}.`;
+      const message = `${SCAN_MESSAGES[accountTier][scanType]}. Prochain scan disponible le ${absoluteDate} (dans ${formattedTime}).`;
 
       return new Response(
         JSON.stringify({

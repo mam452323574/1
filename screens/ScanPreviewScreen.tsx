@@ -68,7 +68,25 @@ export default function ScanPreviewScreen() {
       console.error('[ScanPreview] Error stack:', err instanceof Error ? err.stack : 'No stack trace');
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
       console.error('[ScanPreview] Displaying error alert:', errorMessage);
-      Alert.alert('Erreur', errorMessage);
+
+      if (errorMessage.includes('Limite') && errorMessage.includes('atteinte')) {
+        Alert.alert(
+          'Limite atteinte',
+          errorMessage,
+          [
+            { text: 'OK', style: 'cancel' },
+            {
+              text: 'Passer à Premium',
+              onPress: () => {
+                router.push('/premium-plan');
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Erreur', errorMessage);
+      }
+
       setLoading(false);
     }
   };

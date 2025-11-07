@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LineChart, BarChart } from 'react-native-chart-kit';
@@ -18,10 +18,18 @@ export default function AnalyticsScreen() {
   const [nutritionData, setNutritionData] = useState<NutritionHistoryDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (isFetchingRef.current) {
+        console.log('[AnalyticsScreen] Fetch already in progress, skipping...');
+        return;
+      }
+
       console.log('[AnalyticsScreen] fetchData called with period:', period);
+      isFetchingRef.current = true;
+
       try {
         setLoading(true);
         setError(null);
@@ -65,6 +73,7 @@ export default function AnalyticsScreen() {
       } finally {
         console.log('[AnalyticsScreen] fetchData completed, setting loading to false');
         setLoading(false);
+        isFetchingRef.current = false;
       }
     };
 
