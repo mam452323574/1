@@ -254,7 +254,24 @@ export class ApiService {
 
     if (!eligibility.allowed) {
       console.error('[ApiService] Scan not allowed:', eligibility.message);
-      throw new Error(eligibility.message || 'Scan non autorisé');
+
+      let errorMessage = eligibility.message || 'Scan non autorisé';
+
+      if (eligibility.next_available_date) {
+        const nextDate = new Date(eligibility.next_available_date);
+        const formattedDate = nextDate.toLocaleString('fr-FR', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        const baseMessage = errorMessage.split('.')[0];
+        errorMessage = `${baseMessage}. Prochain scan disponible le ${formattedDate}.`;
+      }
+
+      throw new Error(errorMessage);
     }
 
     let analysisResult: N8nAnalysisResponse | null = null;

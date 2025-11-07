@@ -21,6 +21,8 @@ export default function AnalyticsScreen() {
   const isFetchingRef = useRef(false);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchData = async () => {
       if (isFetchingRef.current) {
         console.log('[AnalyticsScreen] Fetch already in progress, skipping...');
@@ -31,6 +33,8 @@ export default function AnalyticsScreen() {
       isFetchingRef.current = true;
 
       try {
+        if (!mounted) return;
+
         setLoading(true);
         setError(null);
         console.log('[AnalyticsScreen] Fetching analytics data...');
@@ -39,6 +43,8 @@ export default function AnalyticsScreen() {
           ApiService.getAnalytics(period),
           ApiService.getNutritionHistory(period),
         ]);
+
+        if (!mounted) return;
 
         const analyticsResult = results[0];
         const nutritionResult = results[1];
@@ -60,7 +66,9 @@ export default function AnalyticsScreen() {
         if (analyticsResult.status === 'rejected' && nutritionResult.status === 'rejected') {
           const errorMessage = 'Impossible de charger les données';
           console.error('[AnalyticsScreen] Both requests failed, setting error message');
-          setError(errorMessage);
+          if (mounted) {
+            setError(errorMessage);
+          }
         }
 
         console.log('[AnalyticsScreen] All data fetched successfully');
@@ -69,15 +77,23 @@ export default function AnalyticsScreen() {
         console.error('[AnalyticsScreen] Error details:', err instanceof Error ? err.stack : err);
         const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue';
         console.error('[AnalyticsScreen] Setting error message:', errorMessage);
-        setError(errorMessage);
+        if (mounted) {
+          setError(errorMessage);
+        }
       } finally {
         console.log('[AnalyticsScreen] fetchData completed, setting loading to false');
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
         isFetchingRef.current = false;
       }
     };
 
     fetchData();
+
+    return () => {
+      mounted = false;
+    };
   }, [period]);
 
   if (loading) {
