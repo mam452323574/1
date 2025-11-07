@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Lock, Crown } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { BYPASS_PREMIUM_LIMITS } from '@/constants/scan';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 
 interface FeatureGateProps {
@@ -23,7 +24,7 @@ export function FeatureGate({
   const router = useRouter();
   const { userProfile } = useAuth();
 
-  const isPremium = userProfile?.account_tier === 'premium';
+  const isPremium = BYPASS_PREMIUM_LIMITS || userProfile?.account_tier === 'premium';
 
   if (isPremium) {
     return <>{children}</>;

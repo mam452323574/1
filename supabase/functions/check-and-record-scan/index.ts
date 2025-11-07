@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
+const BYPASS_PREMIUM_LIMITS = true;
+
 interface ScanCheckRequest {
   scanType: 'body' | 'health' | 'nutrition';
 }
@@ -121,7 +123,7 @@ Deno.serve(async (req: Request) => {
     const validTimestamps = (record.scan_timestamps || [])
       .filter((ts: string) => new Date(ts).getTime() > cutoffTime);
 
-    if (validTimestamps.length >= limit.count) {
+    if (!BYPASS_PREMIUM_LIMITS && validTimestamps.length >= limit.count) {
       const oldestTimestamp = validTimestamps.sort()[0];
       const nextAvailableDate = new Date(oldestTimestamp).getTime() + limit.periodMs;
       const timeRemaining = nextAvailableDate - now;

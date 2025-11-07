@@ -381,36 +381,22 @@ export class ApiService {
 
     const { data: scans, error } = await supabase
       .from('scans')
-      .select('created_at, analysis_result')
+      .select('created_at')
       .eq('user_id', user.id)
       .eq('scan_type', 'nutrition')
-      .not('analysis_result', 'is', 'null')
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true });
 
     if (error) {
       console.error('[ApiService] Error fetching nutrition scans:', error);
-      throw error;
+      console.warn('[ApiService] Returning empty nutrition history due to error');
+      return [];
     }
 
     console.log('[ApiService] Nutrition scans fetched:', scans?.length || 0, 'records');
+    console.warn('[ApiService] analysis_result column not available yet - returning empty data points');
 
-    const dataPoints: NutritionHistoryDataPoint[] = (scans || []).map((scan: any) => {
-      const totals = scan.analysis_result?.totals || {
-        kcal: 0,
-        protein_g: 0,
-        carb_g: 0,
-        fat_g: 0,
-      };
-
-      return {
-        date: new Date(scan.created_at).toISOString().split('T')[0],
-        kcal: totals.kcal || 0,
-        protein_g: totals.protein_g || 0,
-        carb_g: totals.carb_g || 0,
-        fat_g: totals.fat_g || 0,
-      };
-    });
+    const dataPoints: NutritionHistoryDataPoint[] = [];
 
     const aggregatedData = dataPoints.reduce((acc, point) => {
       const existing = acc.find(d => d.date === point.date);

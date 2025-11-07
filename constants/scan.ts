@@ -1,5 +1,6 @@
 import { ScanType, ScanLimitConfig } from '@/types';
 
+export const BYPASS_PREMIUM_LIMITS = true;
 export const MAX_SCANS_PER_TYPE = 3;
 export const RATE_LIMIT_HOURS = 24;
 export const STORAGE_BUCKET_NAME = 'scan-images';

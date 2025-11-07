@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -73,7 +73,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const checkForAchievements = async () => {
+  const checkForAchievements = useCallback(async () => {
     if (!user) return;
 
     const { data: profile } = await supabase
@@ -133,7 +133,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  };
+  }, [user, scheduleLocalNotification]);
 
   return (
     <NotificationContext.Provider

@@ -50,7 +50,7 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchData();
     checkForAchievements();
-  }, []);
+  }, [checkForAchievements]);
 
   const onRefresh = () => {
     setRefreshing(true);
