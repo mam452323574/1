@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf node_modules package-lock.json",
     "clean:cache": "npm start -- --reset-cache",
-    "clean:all": "rm -rf node_modules package-lock.json && npm install"
+    "clean:all": "rm -rf node_modules package-lock.json && npm install",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
