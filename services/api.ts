@@ -384,7 +384,7 @@ export class ApiService {
       .select('created_at, analysis_result')
       .eq('user_id', user.id)
       .eq('scan_type', 'nutrition')
-      .not('analysis_result', 'is', null)
+      .not('analysis_result', 'is', 'null')
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true });
 

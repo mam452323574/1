@@ -46,7 +46,7 @@ export default function NotificationsScreen() {
       if (filter === 'unread') {
         query = query.is('read_at', null);
       } else if (filter === 'read') {
-        query = query.not('read_at', 'is', null);
+        query = query.not('read_at', 'is', 'null');
       }
 
       const { data, error } = await query;

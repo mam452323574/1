@@ -36,16 +36,33 @@ const SCAN_LIMITS = {
 
 const SCAN_MESSAGES = {
   free: {
-    health: 'Limite hebdomadaire atteinte. Prochain scan disponible dans',
-    body: 'Limite mensuelle atteinte. Prochain scan disponible dans',
-    nutrition: 'Limite atteinte. Prochain scan disponible dans',
+    health: 'Limite hebdomadaire atteinte',
+    body: 'Limite mensuelle atteinte',
+    nutrition: 'Limite atteinte',
   },
   premium: {
-    health: 'Limite quotidienne atteinte (3 scans). Prochain scan disponible dans',
-    body: 'Limite quotidienne atteinte (3 scans). Prochain scan disponible dans',
-    nutrition: 'Limite quotidienne atteinte (3 scans). Prochain scan disponible dans',
+    health: 'Limite quotidienne atteinte (3 scans)',
+    body: 'Limite quotidienne atteinte (3 scans)',
+    nutrition: 'Limite quotidienne atteinte (3 scans)',
   },
 };
+
+function formatTimeRemaining(milliseconds: number): string {
+  const seconds = Math.floor(milliseconds / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) {
+    return `${days} jour${days > 1 ? 's' : ''}`;
+  } else if (hours > 0) {
+    return `${hours} heure${hours > 1 ? 's' : ''}`;
+  } else if (minutes > 0) {
+    return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+  } else {
+    return `${seconds} seconde${seconds > 1 ? 's' : ''}`;
+  }
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -107,12 +124,16 @@ Deno.serve(async (req: Request) => {
     if (validTimestamps.length >= limit.count) {
       const oldestTimestamp = validTimestamps.sort()[0];
       const nextAvailableDate = new Date(oldestTimestamp).getTime() + limit.periodMs;
+      const timeRemaining = nextAvailableDate - now;
+      const formattedTime = formatTimeRemaining(timeRemaining);
+
+      const message = `${SCAN_MESSAGES[accountTier][scanType]}. Prochain scan disponible dans ${formattedTime}.`;
 
       return new Response(
         JSON.stringify({
           success: true,
           allowed: false,
-          message: SCAN_MESSAGES[accountTier][scanType],
+          message: message,
           next_available_date: nextAvailableDate,
           current_count: validTimestamps.length,
           limit: limit.count,
