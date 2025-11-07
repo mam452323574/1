@@ -259,12 +259,14 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.HealthScan;
-				PRODUCT_NAME = HealthScan;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.healthscan.app";
+				PRODUCT_NAME = "HealthScan";
 				SWIFT_OBJC_BRIDGING_HEADER = "HealthScan/HealthScan-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				CODE_SIGN_ENTITLEMENTS = HealthScan/HealthScan.entitlements;
 			};
 			name = Debug;
 		};
@@ -286,11 +288,13 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.HealthScan;
-				PRODUCT_NAME = HealthScan;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.healthscan.app";
+				PRODUCT_NAME = "HealthScan";
 				SWIFT_OBJC_BRIDGING_HEADER = "HealthScan/HealthScan-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				CODE_SIGN_ENTITLEMENTS = HealthScan/HealthScan.entitlements;
 			};
 			name = Release;
 		};

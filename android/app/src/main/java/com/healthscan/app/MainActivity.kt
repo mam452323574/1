@@ -1,4 +1,4 @@
-package com.healthscan
+package com.healthscan.app
 
 import android.os.Build
 import android.os.Bundle
