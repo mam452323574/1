@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import { LucideIcon } from 'lucide-react-native';
 import { COLORS } from '@/constants/theme';
@@ -18,7 +19,7 @@ interface AnimatedTabBarIconProps {
   showBadge?: boolean;
 }
 
-export function AnimatedTabBarIcon({
+function StaticTabBarIcon({
   IconComponent,
   color,
   size,
@@ -26,37 +27,93 @@ export function AnimatedTabBarIcon({
   onPress,
   showBadge = false,
 }: AnimatedTabBarIconProps) {
+  return (
+    <Pressable onPress={onPress} style={styles.container}>
+      <View style={styles.iconContainer}>
+        <IconComponent color={color} size={size} strokeWidth={focused ? 2.5 : 2} />
+        {showBadge && <View style={styles.badge} />}
+      </View>
+    </Pressable>
+  );
+}
+
+export function AnimatedTabBarIcon(props: AnimatedTabBarIconProps) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return <StaticTabBarIcon {...props} />;
+  }
+
+  return <AnimatedTabBarIconInner {...props} onError={() => setHasError(true)} />;
+}
+
+function AnimatedTabBarIconInner({
+  IconComponent,
+  color,
+  size,
+  focused,
+  onPress,
+  showBadge = false,
+  onError,
+}: AnimatedTabBarIconProps & { onError: () => void }) {
   const scale = useSharedValue(1);
   const badgeScale = useSharedValue(showBadge ? 1 : 0);
 
   useEffect(() => {
-    badgeScale.value = withSpring(showBadge ? 1 : 0, {
-      damping: 15,
-      stiffness: 150,
-    });
+    try {
+      badgeScale.value = withSpring(showBadge ? 1 : 0, {
+        damping: 15,
+        stiffness: 150,
+      });
+    } catch (error) {
+      console.error('[AnimatedTabBarIcon] Animation error:', error);
+      onError();
+    }
   }, [showBadge]);
 
   const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
+    try {
+      return {
+        transform: [{ scale: scale.value }],
+      };
+    } catch (error) {
+      console.error('[AnimatedTabBarIcon] Animated style error:', error);
+      runOnJS(onError)();
+      return { transform: [{ scale: 1 }] };
+    }
   });
 
   const badgeAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: badgeScale.value }],
-    };
+    try {
+      return {
+        transform: [{ scale: badgeScale.value }],
+      };
+    } catch (error) {
+      console.error('[AnimatedTabBarIcon] Badge animated style error:', error);
+      runOnJS(onError)();
+      return { transform: [{ scale: showBadge ? 1 : 0 }] };
+    }
   });
 
   const handlePressIn = () => {
-    scale.value = withTiming(0.9, { duration: 100 });
+    try {
+      scale.value = withTiming(0.9, { duration: 100 });
+    } catch (error) {
+      console.error('[AnimatedTabBarIcon] Press in error:', error);
+      onError();
+    }
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, {
-      damping: 10,
-      stiffness: 300,
-    });
+    try {
+      scale.value = withSpring(1, {
+        damping: 10,
+        stiffness: 300,
+      });
+    } catch (error) {
+      console.error('[AnimatedTabBarIcon] Press out error:', error);
+      onError();
+    }
   };
 
   return (

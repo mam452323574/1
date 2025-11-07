@@ -51,11 +51,12 @@ function RootLayoutNav() {
       navigationAttempts.current = 0;
     }
 
-    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy' || segments[0] === 'notifications' || segments[0] === 'notification-settings' || segments[0] === 'scan-detail' || segments[0] === 'scan-history' || segments[0] === 'scan-results' || segments[0] === 'trusted-devices';
-    const inUsernameSetup = segments[0] === 'username-setup';
+    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy' || segments[0] === 'notifications' || segments[0] === 'notification-settings' || segments[0] === 'scan-detail' || segments[0] === 'scan-history' || segments[0] === 'scan-results' || segments[0] === 'trusted-devices' || segments[0] === 'premium-upgrade';
+    const inAuth = segments[0] === '(auth)';
+    const inUsernameSetup = segments[0] === '(auth)' && segments[1] === 'username-setup';
     const inPremiumUpgrade = segments[0] === 'premium-upgrade';
-    const inEmailVerification = segments[0] === 'email-verification';
-    const inLogin = segments[0] === 'login' || segments[0] === 'signup';
+    const inEmailVerification = segments[0] === '(auth)' && segments[1] === 'email-verification';
+    const inLogin = segments[0] === '(auth)' && (segments[1] === 'login' || segments[1] === 'signup');
 
     const performNavigation = async (path: string, reason: string) => {
       try {
@@ -82,14 +83,14 @@ function RootLayoutNav() {
       return;
     }
 
-    if (!user && !inLogin && !inEmailVerification) {
-      performNavigation('/login', 'No user detected');
+    if (!user && !inAuth) {
+      performNavigation('/(auth)/login', 'No user detected');
     } else if (user && !userProfile?.username && !inUsernameSetup && !pendingVerification) {
       console.log('[Navigation] User missing username');
       console.log('[Navigation] User ID:', user.id);
       console.log('[Navigation] User Profile:', userProfile);
-      performNavigation('/username-setup', 'Username setup required');
-    } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin && !inEmailVerification) {
+      performNavigation('/(auth)/username-setup', 'Username setup required');
+    } else if (user && userProfile?.username && !inAuthGroup && !inAuth) {
       performNavigation('/(tabs)', 'User authenticated');
     }
   }, [user, userProfile, loading, segments, pendingVerification, isNavigating, hasInitialized, isSigningOut]);
@@ -104,10 +105,8 @@ function RootLayoutNav() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="login" />
-      <Stack.Screen name="signup" />
-      <Stack.Screen name="email-verification" />
-      <Stack.Screen name="username-setup" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
       <Stack.Screen name="premium-upgrade" options={{ presentation: 'modal' }} />
       <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
       <Stack.Screen name="trusted-devices" options={{ presentation: 'modal' }} />
@@ -118,7 +117,6 @@ function RootLayoutNav() {
       <Stack.Screen name="scan-detail" />
       <Stack.Screen name="scan-history" />
       <Stack.Screen name="scan-results" />
-      <Stack.Screen name="(tabs)" />
       <Stack.Screen name="recipes" options={{ presentation: 'modal' }} />
       <Stack.Screen name="exercises" options={{ presentation: 'modal' }} />
       <Stack.Screen name="scan-preview" options={{ presentation: 'fullScreenModal' }} />
