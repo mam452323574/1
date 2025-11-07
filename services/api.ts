@@ -53,15 +53,21 @@ export class ApiService {
   }
 
   static async getAnalytics(period: '7days' | '30days' | '90days'): Promise<AnalyticsData> {
+    console.log('[ApiService] getAnalytics called with period:', period);
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
+      console.error('[ApiService] User not authenticated');
       throw new Error('User not authenticated');
     }
+
+    console.log('[ApiService] User ID:', user.id);
 
     const days = period === '7days' ? 7 : period === '30days' ? 30 : 90;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+
+    console.log('[ApiService] Fetching health_scores from:', startDate.toISOString().split('T')[0]);
 
     const { data: healthScores, error } = await supabase
       .from('health_scores')
@@ -70,7 +76,12 @@ export class ApiService {
       .gte('date', startDate.toISOString().split('T')[0])
       .order('date', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[ApiService] Error fetching health_scores:', error);
+      throw error;
+    }
+
+    console.log('[ApiService] health_scores fetched:', healthScores?.length || 0, 'records');
 
     const healthScoreHistory = (healthScores || []).map((h: any) => ({
       date: h.date,
@@ -224,29 +235,47 @@ export class ApiService {
   }
 
   static async createScan(imageUri: string, scanType: ScanType) {
+    console.log('[ApiService] createScan called');
+    console.log('[ApiService] imageUri:', imageUri);
+    console.log('[ApiService] scanType:', scanType);
+
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
+      console.error('[ApiService] User not authenticated');
       throw new Error('User not authenticated');
     }
 
+    console.log('[ApiService] User ID:', user.id);
+    console.log('[ApiService] Checking scan eligibility...');
+
     const eligibility = await this.checkScanEligibility(scanType);
+    console.log('[ApiService] Eligibility result:', eligibility);
+
     if (!eligibility.allowed) {
+      console.error('[ApiService] Scan not allowed:', eligibility.message);
       throw new Error(eligibility.message || 'Scan non autorisé');
     }
 
     let analysisResult: N8nAnalysisResponse | null = null;
 
     if (scanType === 'nutrition') {
+      console.log('[ApiService] Nutrition scan - calling N8nWebhookService...');
       analysisResult = await N8nWebhookService.analyzeImage(imageUri);
+      console.log('[ApiService] Analysis result received from N8n');
     }
 
+    console.log('[ApiService] Fetching image from URI...');
     const response = await fetch(imageUri);
+    console.log('[ApiService] Image fetch response status:', response.status);
+
     const blob = await response.blob();
+    console.log('[ApiService] Image converted to blob, size:', blob.size);
 
     const timestamp = Date.now();
     const fileExt = imageUri.split('.').pop() || 'jpg';
     const fileName = `${user.id}/${timestamp}.${fileExt}`;
+    console.log('[ApiService] Uploading to storage with filename:', fileName);
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKET_NAME)
@@ -255,11 +284,19 @@ export class ApiService {
         upsert: false,
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('[ApiService] Upload error:', uploadError);
+      throw uploadError;
+    }
+
+    console.log('[ApiService] Image uploaded successfully:', uploadData);
 
     const { data: publicUrlData } = supabase.storage
       .from(STORAGE_BUCKET_NAME)
       .getPublicUrl(fileName);
+
+    console.log('[ApiService] Public URL generated:', publicUrlData.publicUrl);
+    console.log('[ApiService] Inserting scan record into database...');
 
     const { data, error } = await supabase
       .from('scans')
@@ -272,7 +309,12 @@ export class ApiService {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[ApiService] Error inserting scan:', error);
+      throw error;
+    }
+
+    console.log('[ApiService] Scan created successfully:', data);
     return data;
   }
 
@@ -321,15 +363,21 @@ export class ApiService {
   }
 
   static async getNutritionHistory(period: '7days' | '30days' | '90days'): Promise<NutritionHistoryDataPoint[]> {
+    console.log('[ApiService] getNutritionHistory called with period:', period);
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
+      console.error('[ApiService] User not authenticated');
       throw new Error('User not authenticated');
     }
+
+    console.log('[ApiService] User ID:', user.id);
 
     const days = period === '7days' ? 7 : period === '30days' ? 30 : 90;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+
+    console.log('[ApiService] Fetching scans from:', startDate.toISOString());
 
     const { data: scans, error } = await supabase
       .from('scans')
@@ -340,7 +388,12 @@ export class ApiService {
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[ApiService] Error fetching nutrition scans:', error);
+      throw error;
+    }
+
+    console.log('[ApiService] Nutrition scans fetched:', scans?.length || 0, 'records');
 
     const dataPoints: NutritionHistoryDataPoint[] = (scans || []).map((scan: any) => {
       const totals = scan.analysis_result?.totals || {

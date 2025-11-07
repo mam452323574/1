@@ -20,18 +20,40 @@ export default function AnalyticsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
+    console.log('[AnalyticsScreen] fetchData called with period:', period);
     try {
       setLoading(true);
       setError(null);
+      console.log('[AnalyticsScreen] Fetching analytics data...');
+
       const [analyticsData, nutritionHistory] = await Promise.all([
-        ApiService.getAnalytics(period),
-        ApiService.getNutritionHistory(period),
+        ApiService.getAnalytics(period).then(data => {
+          console.log('[AnalyticsScreen] Analytics data received:', data);
+          return data;
+        }).catch(err => {
+          console.error('[AnalyticsScreen] Error fetching analytics:', err);
+          throw err;
+        }),
+        ApiService.getNutritionHistory(period).then(data => {
+          console.log('[AnalyticsScreen] Nutrition history received:', data.length, 'items');
+          return data;
+        }).catch(err => {
+          console.error('[AnalyticsScreen] Error fetching nutrition history:', err);
+          throw err;
+        }),
       ]);
+
+      console.log('[AnalyticsScreen] All data fetched successfully');
       setData(analyticsData);
       setNutritionData(nutritionHistory);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      console.error('[AnalyticsScreen] Error in fetchData:', err);
+      console.error('[AnalyticsScreen] Error details:', err instanceof Error ? err.stack : err);
+      const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue';
+      console.error('[AnalyticsScreen] Setting error message:', errorMessage);
+      setError(errorMessage);
     } finally {
+      console.log('[AnalyticsScreen] fetchData completed, setting loading to false');
       setLoading(false);
     }
   };

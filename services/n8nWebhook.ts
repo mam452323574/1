@@ -44,6 +44,8 @@ export class N8nWebhookService {
   }
 
   static async analyzeImage(imageUri: string): Promise<N8nAnalysisResponse> {
+    console.log('[N8nWebhook] analyzeImage called with imageUri:', imageUri);
+
     const counter = await this.getCurrentCounter();
     const webhookUrl = WORKFLOW_URLS[counter];
 
@@ -53,11 +55,14 @@ export class N8nWebhookService {
     await this.incrementCounter();
 
     try {
+      console.log('[N8nWebhook] Building FormData...');
       const formData = new FormData();
 
       const filename = imageUri.split('/').pop() || 'image.jpg';
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      console.log('[N8nWebhook] File info - filename:', filename, 'type:', type);
 
       formData.append('file', {
         uri: imageUri,
@@ -65,9 +70,15 @@ export class N8nWebhookService {
         type,
       } as any);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      console.log('[N8nWebhook] FormData prepared successfully');
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error('[N8nWebhook] Request timeout after', REQUEST_TIMEOUT_MS, 'ms');
+        controller.abort();
+      }, REQUEST_TIMEOUT_MS);
+
+      console.log('[N8nWebhook] Sending POST request to webhook...');
       const response = await fetch(webhookUrl, {
         method: 'POST',
         body: formData,
@@ -78,17 +89,21 @@ export class N8nWebhookService {
       });
 
       clearTimeout(timeoutId);
+      console.log('[N8nWebhook] Response received - status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[N8nWebhook] HTTP ${response.status}:`, errorText);
+        console.error('[N8nWebhook] Response headers:', JSON.stringify(response.headers));
         throw new Error(`L'analyse a échoué (${response.status}). Veuillez réessayer.`);
       }
 
+      console.log('[N8nWebhook] Parsing JSON response...');
       const data = await response.json();
+      console.log('[N8nWebhook] JSON parsed successfully');
 
       if (!data.items || !data.totals) {
-        console.error('[N8nWebhook] Invalid response structure:', data);
+        console.error('[N8nWebhook] Invalid response structure:', JSON.stringify(data));
         throw new Error('Réponse invalide du serveur d\'analyse.');
       }
 
@@ -99,14 +114,21 @@ export class N8nWebhookService {
 
       return data as N8nAnalysisResponse;
     } catch (error: any) {
+      console.error('[N8nWebhook] Error in analyzeImage:', error);
+      console.error('[N8nWebhook] Error name:', error.name);
+      console.error('[N8nWebhook] Error message:', error.message);
+
       if (error.name === 'AbortError') {
+        console.error('[N8nWebhook] Request was aborted due to timeout');
         throw new Error('L\'analyse a pris trop de temps. Veuillez vérifier votre connexion internet et réessayer.');
       }
 
       if (error.message?.includes('Network request failed')) {
+        console.error('[N8nWebhook] Network request failed');
         throw new Error('L\'analyse est actuellement indisponible. Veuillez vérifier votre connexion internet et réessayer plus tard.');
       }
 
+      console.error('[N8nWebhook] Rethrowing original error');
       throw error;
     }
   }

@@ -21,20 +21,31 @@ export default function ScanPreviewScreen() {
   const { setBadge } = useBadges();
 
   const handleConfirm = async () => {
+    console.log('[ScanPreview] handleConfirm called');
+    console.log('[ScanPreview] imageUri:', imageUri);
+    console.log('[ScanPreview] scanType:', scanType);
+
     try {
       setLoading(true);
+      console.log('[ScanPreview] Loading state set to true');
 
       if (scanType === 'nutrition') {
         setLoadingMessage('Analyse en cours...');
+        console.log('[ScanPreview] Nutrition scan detected, loading message updated');
       }
 
+      console.log('[ScanPreview] Calling ApiService.createScan...');
       const scanData = await ApiService.createScan(imageUri, scanType);
+      console.log('[ScanPreview] Scan created successfully:', scanData);
 
       setShowConfetti(true);
       setBadge('analytics');
+      console.log('[ScanPreview] Confetti triggered, badge set');
 
       setTimeout(() => {
+        console.log('[ScanPreview] Timeout callback executing...');
         if (scanType === 'nutrition' && scanData.analysis_result) {
+          console.log('[ScanPreview] Navigating to scan-results with analysis data');
           router.replace({
             pathname: '/scan-results',
             params: {
@@ -43,6 +54,7 @@ export default function ScanPreviewScreen() {
             },
           });
         } else {
+          console.log('[ScanPreview] Non-nutrition scan or no analysis result, showing alert');
           Alert.alert('Succès', 'Votre scan a bien été enregistré', [
             {
               text: 'OK',
@@ -52,7 +64,10 @@ export default function ScanPreviewScreen() {
         }
       }, 1500);
     } catch (err) {
+      console.error('[ScanPreview] Error in handleConfirm:', err);
+      console.error('[ScanPreview] Error stack:', err instanceof Error ? err.stack : 'No stack trace');
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
+      console.error('[ScanPreview] Displaying error alert:', errorMessage);
       Alert.alert('Erreur', errorMessage);
       setLoading(false);
     }
