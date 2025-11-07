@@ -645,13 +645,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('[SignOut] Starting complete cleanup...');
 
-      console.log('[SignOut] Step 1: Clearing local state');
+      console.log('[SignOut] Step 1: Signing out from Supabase first');
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) {
+        console.error('[SignOut] Supabase sign out error:', error);
+      }
+
+      console.log('[SignOut] Step 2: Clearing local state');
       setUserProfile(null);
       setUser(null);
       setSession(null);
       setPendingVerification(null);
 
-      console.log('[SignOut] Step 2: Clearing AsyncStorage');
+      console.log('[SignOut] Step 3: Clearing AsyncStorage');
       try {
         await AsyncStorage.multiRemove([
           'supabase.auth.token',
@@ -661,13 +667,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('[SignOut] AsyncStorage cleanup error:', storageError);
       }
 
-      console.log('[SignOut] Step 3: Signing out from Supabase');
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      if (error) {
-        console.error('[SignOut] Supabase sign out error:', error);
-        throw error;
-      }
-
       console.log('[SignOut] Complete cleanup finished successfully');
     } catch (error) {
       console.error('[SignOut] Error during sign out:', error);
@@ -675,7 +674,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setPendingVerification(null);
-      throw error;
     }
   };
 

@@ -14,84 +14,93 @@ function RootLayoutNav() {
   const { user, userProfile, loading, pendingVerification, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const [redirectCount, setRedirectCount] = useState(0);
-  const [loopDetected, setLoopDetected] = useState(false);
-  const lastRedirectTime = useRef<number>(0);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const navigationAttempts = useRef<number>(0);
+  const lastNavigationTime = useRef<number>(0);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading) {
+      console.log('[Navigation] Still loading auth state...');
+      return;
+    }
 
-    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy' || segments[0] === 'notifications' || segments[0] === 'notification-settings';
+    if (isNavigating || isSigningOut) {
+      console.log('[Navigation] Navigation in progress, skipping...');
+      return;
+    }
+
+    if (!hasInitialized) {
+      console.log('[Navigation] Initial navigation setup');
+      setHasInitialized(true);
+    }
+
+    const now = Date.now();
+    const timeSinceLastNav = now - lastNavigationTime.current;
+
+    if (timeSinceLastNav < 500) {
+      navigationAttempts.current++;
+      console.warn(`[Navigation] Rapid navigation attempt #${navigationAttempts.current}`);
+
+      if (navigationAttempts.current >= 3) {
+        console.error('[Navigation] Too many rapid navigation attempts, blocking');
+        return;
+      }
+    } else {
+      navigationAttempts.current = 0;
+    }
+
+    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy' || segments[0] === 'notifications' || segments[0] === 'notification-settings' || segments[0] === 'scan-detail' || segments[0] === 'scan-history' || segments[0] === 'scan-results' || segments[0] === 'trusted-devices';
     const inUsernameSetup = segments[0] === 'username-setup';
     const inPremiumUpgrade = segments[0] === 'premium-upgrade';
     const inEmailVerification = segments[0] === 'email-verification';
     const inLogin = segments[0] === 'login' || segments[0] === 'signup';
 
-    const now = Date.now();
-    const timeSinceLastRedirect = now - lastRedirectTime.current;
+    const performNavigation = async (path: string, reason: string) => {
+      try {
+        console.log(`[Navigation] ${reason} -> ${path}`);
+        setIsNavigating(true);
+        lastNavigationTime.current = now;
 
-    if (timeSinceLastRedirect < 1000 && !inAuthGroup && !inLogin && !inEmailVerification) {
-      console.warn('[Navigation] Rapid redirect detected, incrementing counter');
-      setRedirectCount(prev => prev + 1);
-    } else {
-      if ((inAuthGroup || inLogin || inEmailVerification) && redirectCount > 0) {
-        console.log('[Navigation] User reached stable state, resetting counter');
-        setRedirectCount(0);
-        setLoopDetected(false);
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        router.replace(path as any);
+
+        setTimeout(() => {
+          setIsNavigating(false);
+          navigationAttempts.current = 0;
+        }, 300);
+      } catch (error) {
+        console.error('[Navigation] Navigation failed:', error);
+        setIsNavigating(false);
       }
-    }
-
-    if (redirectCount >= 5) {
-      console.error('[Navigation] LOOP DETECTED - Too many redirects!');
-      setLoopDetected(true);
-      Alert.alert(
-        'Erreur de Navigation',
-        'Une boucle de redirection a été détectée. Cela peut indiquer un problème avec la configuration de votre profil. Veuillez vous déconnecter et réessayer.',
-        [
-          {
-            text: 'Se Déconnecter',
-            style: 'destructive',
-            onPress: async () => {
-              setRedirectCount(0);
-              setLoopDetected(false);
-              await signOut();
-              router.replace('/login');
-            },
-          },
-          {
-            text: 'Annuler',
-            style: 'cancel',
-            onPress: () => {
-              setRedirectCount(0);
-              setLoopDetected(false);
-            },
-          },
-        ]
-      );
-      return;
-    }
+    };
 
     if (pendingVerification && !inEmailVerification) {
-      console.log('[Navigation] Pending verification detected, staying on verification flow');
+      console.log('[Navigation] Pending verification, staying on current flow');
       return;
     }
 
     if (!user && !inLogin && !inEmailVerification) {
-      console.log('[Navigation] No user detected, redirecting to login');
-      lastRedirectTime.current = now;
-      router.replace('/login');
+      performNavigation('/login', 'No user detected');
     } else if (user && !userProfile?.username && !inUsernameSetup && !pendingVerification) {
-      console.log('[Navigation] User missing username, redirecting to setup');
+      console.log('[Navigation] User missing username');
       console.log('[Navigation] User ID:', user.id);
       console.log('[Navigation] User Profile:', userProfile);
-      lastRedirectTime.current = now;
-      router.replace('/username-setup');
+      performNavigation('/username-setup', 'Username setup required');
     } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin && !inEmailVerification) {
-      console.log('[Navigation] User authenticated, redirecting to tabs');
-      lastRedirectTime.current = now;
-      router.replace('/(tabs)');
+      performNavigation('/(tabs)', 'User authenticated');
     }
-  }, [user, userProfile, loading, segments, redirectCount, pendingVerification]);
+  }, [user, userProfile, loading, segments, pendingVerification, isNavigating, hasInitialized, isSigningOut]);
+
+  if (!hasInitialized || loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Chargement...</Text>
+      </View>
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -106,6 +115,9 @@ function RootLayoutNav() {
       <Stack.Screen name="privacy-policy" />
       <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
       <Stack.Screen name="notification-settings" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="scan-detail" />
+      <Stack.Screen name="scan-history" />
+      <Stack.Screen name="scan-results" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="recipes" options={{ presentation: 'modal' }} />
       <Stack.Screen name="exercises" options={{ presentation: 'modal' }} />
@@ -114,6 +126,20 @@ function RootLayoutNav() {
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    fontSize: SIZES.lg,
+    color: COLORS.gray,
+    fontWeight: '500',
+  },
+});
 
 export default function RootLayout() {
   useFrameworkReady();
