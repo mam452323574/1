@@ -201,3 +201,50 @@ export interface SendVerificationCodeResponse {
   expires_at?: string;
   error?: string;
 }
+
+export interface NutritionItem {
+  name: string;
+  kcal: number;
+  protein_g: number;
+  carb_g: number;
+  fat_g: number;
+}
+
+export interface NutritionTotals {
+  kcal: number;
+  protein_g: number;
+  carb_g: number;
+  fat_g: number;
+}
+
+export interface N8nAnalysisResponse {
+  items: NutritionItem[];
+  totals: NutritionTotals;
+}
+
+export interface Scan {
+  id: string;
+  user_id: string;
+  scan_type: ScanType;
+  image_url: string | null;
+  analysis_result: N8nAnalysisResponse | null;
+  created_at: string;
+  type?: string | null;
+  percentage?: number | null;
+}
+
+export interface ScanHistoryItem {
+  id: string;
+  scan_type: ScanType;
+  image_url: string | null;
+  analysis_result: N8nAnalysisResponse | null;
+  created_at: string;
+}
+
+export interface NutritionHistoryDataPoint {
+  date: string;
+  kcal: number;
+  protein_g: number;
+  carb_g: number;
+  fat_g: number;
+}

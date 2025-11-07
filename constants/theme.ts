@@ -13,6 +13,8 @@ export const COLORS = {
   error: '#FF3B30',
   success: '#34C759',
   warning: '#FF9500',
+  border: '#E5E5EA',
+  accent: '#007AFF',
 };
 
 export const FONTS = {
@@ -23,6 +25,7 @@ export const FONTS = {
 
 export const FONT_WEIGHTS = {
   regular: '400' as const,
+  medium: '500' as const,
   semiBold: '600' as const,
   bold: '700' as const,
 };
@@ -40,6 +43,8 @@ export const SIZES = {
   text14: 14,
   text16: 16,
   text18: 18,
+  text20: 20,
+  text28: 28,
   scoreNumber: 48,
   scoreSub: 14,
 };

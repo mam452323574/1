@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { useRouter } from 'expo-router';
 import { LineChart, BarChart } from 'react-native-chart-kit';
+import { History } from 'lucide-react-native';
 import { ApiService } from '@/services/api';
-import { AnalyticsData } from '@/types';
+import { AnalyticsData, NutritionHistoryDataPoint } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
@@ -10,8 +12,10 @@ import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants
 const screenWidth = Dimensions.get('window').width;
 
 export default function AnalyticsScreen() {
+  const router = useRouter();
   const [period, setPeriod] = useState<'7days' | '30days' | '90days'>('30days');
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [nutritionData, setNutritionData] = useState<NutritionHistoryDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,8 +23,12 @@ export default function AnalyticsScreen() {
     try {
       setLoading(true);
       setError(null);
-      const analyticsData = await ApiService.getAnalytics(period);
+      const [analyticsData, nutritionHistory] = await Promise.all([
+        ApiService.getAnalytics(period),
+        ApiService.getNutritionHistory(period),
+      ]);
       setData(analyticsData);
+      setNutritionData(nutritionHistory);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     } finally {
@@ -40,7 +48,10 @@ export default function AnalyticsScreen() {
     return <ErrorMessage message={error} />;
   }
 
-  if (!data || data.healthScoreHistory.length === 0) {
+  const hasHealthData = data && data.healthScoreHistory.length > 0;
+  const hasNutritionData = nutritionData && nutritionData.length > 0;
+
+  if (!hasHealthData && !hasNutritionData) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Commencez à scanner pour voir vos progrès!</Text>
@@ -65,7 +76,7 @@ export default function AnalyticsScreen() {
     },
   };
 
-  const healthScoreData = {
+  const healthScoreData = data ? {
     labels: data.healthScoreHistory.slice(-7).map((item) => {
       const date = new Date(item.date);
       return `${date.getDate()}/${date.getMonth() + 1}`;
@@ -75,9 +86,9 @@ export default function AnalyticsScreen() {
         data: data.healthScoreHistory.slice(-7).map((item) => item.value),
       },
     ],
-  };
+  } : null;
 
-  const caloriesData = {
+  const caloriesData = data ? {
     labels: data.calorieHistory.slice(-7).map((item) => {
       const date = new Date(item.date);
       return `${date.getDate()}/${date.getMonth() + 1}`;
@@ -87,9 +98,9 @@ export default function AnalyticsScreen() {
         data: data.calorieHistory.slice(-7).map((item) => item.consumed),
       },
     ],
-  };
+  } : null;
 
-  const bodyCompositionData = {
+  const bodyCompositionData = data ? {
     labels: data.bodyCompositionHistory.slice(-7).map((item) => {
       const date = new Date(item.date);
       return `${date.getDate()}/${date.getMonth() + 1}`;
@@ -107,12 +118,41 @@ export default function AnalyticsScreen() {
       },
     ],
     legend: ['Masse Grasse %', 'Muscle %'],
-  };
+  } : null;
+
+  const nutritionFatData = nutritionData.length > 0 ? {
+    labels: nutritionData.slice(-7).map((item) => {
+      const date = new Date(item.date);
+      return `${date.getDate()}/${date.getMonth() + 1}`;
+    }),
+    datasets: [
+      {
+        data: nutritionData.slice(-7).map((item) => item.fat_g),
+      },
+    ],
+  } : null;
+
+  const nutritionCaloriesData = nutritionData.length > 0 ? {
+    labels: nutritionData.slice(-7).map((item) => {
+      const date = new Date(item.date);
+      return `${date.getDate()}/${date.getMonth() + 1}`;
+    }),
+    datasets: [
+      {
+        data: nutritionData.slice(-7).map((item) => item.kcal),
+      },
+    ],
+  } : null;
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>analyses</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>analyses</Text>
+        </View>
+        <TouchableOpacity onPress={() => router.push('/scan-history')} style={styles.historyButton}>
+          <History color={COLORS.primary} size={24} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.periodSelector}>
@@ -142,42 +182,76 @@ export default function AnalyticsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.chartSection}>
-        <Text style={styles.chartTitle}>Score Santé</Text>
-        <LineChart
-          data={healthScoreData}
-          width={screenWidth - SPACING.lg * 2}
-          height={220}
-          chartConfig={chartConfig}
-          bezier
-          style={styles.chart}
-        />
-      </View>
+      {hasHealthData && healthScoreData && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Score Santé</Text>
+          <LineChart
+            data={healthScoreData}
+            width={screenWidth - SPACING.lg * 2}
+            height={220}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+          />
+        </View>
+      )}
 
-      <View style={styles.chartSection}>
-        <Text style={styles.chartTitle}>Calories Consommées</Text>
-        <BarChart
-          data={caloriesData}
-          width={screenWidth - SPACING.lg * 2}
-          height={220}
-          chartConfig={chartConfig}
-          style={styles.chart}
-          yAxisLabel=""
-          yAxisSuffix=""
-        />
-      </View>
+      {hasHealthData && caloriesData && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Calories Consommées</Text>
+          <BarChart
+            data={caloriesData}
+            width={screenWidth - SPACING.lg * 2}
+            height={220}
+            chartConfig={chartConfig}
+            style={styles.chart}
+            yAxisLabel=""
+            yAxisSuffix=""
+          />
+        </View>
+      )}
 
-      <View style={styles.chartSection}>
-        <Text style={styles.chartTitle}>Composition Corporelle</Text>
-        <LineChart
-          data={bodyCompositionData}
-          width={screenWidth - SPACING.lg * 2}
-          height={220}
-          chartConfig={chartConfig}
-          bezier
-          style={styles.chart}
-        />
-      </View>
+      {hasHealthData && bodyCompositionData && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Composition Corporelle</Text>
+          <LineChart
+            data={bodyCompositionData}
+            width={screenWidth - SPACING.lg * 2}
+            height={220}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+          />
+        </View>
+      )}
+
+      {hasNutritionData && nutritionCaloriesData && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Calories Nutritionnelles</Text>
+          <LineChart
+            data={nutritionCaloriesData}
+            width={screenWidth - SPACING.lg * 2}
+            height={220}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+          />
+        </View>
+      )}
+
+      {hasNutritionData && nutritionFatData && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Lipides Consommés (g)</Text>
+          <LineChart
+            data={nutritionFatData}
+            width={screenWidth - SPACING.lg * 2}
+            height={220}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+          />
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -188,16 +262,25 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: SPACING.page,
     paddingTop: SPACING.xxxl,
     paddingBottom: SPACING.md,
     backgroundColor: COLORS.white,
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: SIZES.text14,
     fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.gray,
     textTransform: 'lowercase',
+  },
+  historyButton: {
+    padding: SPACING.xs,
   },
   periodSelector: {
     flexDirection: 'row',

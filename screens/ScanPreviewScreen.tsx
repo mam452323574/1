@@ -16,23 +16,40 @@ export default function ScanPreviewScreen() {
   const imageUri = params.imageUri as string;
   const scanType = params.scanType as ScanType;
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Enregistrement...');
   const [showConfetti, setShowConfetti] = useState(false);
   const { setBadge } = useBadges();
 
   const handleConfirm = async () => {
     try {
       setLoading(true);
-      await ApiService.createScan(imageUri, scanType);
+
+      if (scanType === 'nutrition') {
+        setLoadingMessage('Analyse en cours...');
+      }
+
+      const scanData = await ApiService.createScan(imageUri, scanType);
+
       setShowConfetti(true);
       setBadge('analytics');
 
       setTimeout(() => {
-        Alert.alert('Succès', 'Votre scan a bien été enregistré', [
-          {
-            text: 'OK',
-            onPress: () => router.push('/(tabs)'),
-          },
-        ]);
+        if (scanType === 'nutrition' && scanData.analysis_result) {
+          router.replace({
+            pathname: '/scan-results',
+            params: {
+              imageUri: imageUri,
+              analysisData: JSON.stringify(scanData.analysis_result),
+            },
+          });
+        } else {
+          Alert.alert('Succès', 'Votre scan a bien été enregistré', [
+            {
+              text: 'OK',
+              onPress: () => router.push('/(tabs)'),
+            },
+          ]);
+        }
       }, 1500);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
@@ -64,7 +81,7 @@ export default function ScanPreviewScreen() {
         </View>
 
         <Button
-          title={loading ? 'Enregistrement...' : 'Confirmer et Sauvegarder'}
+          title={loading ? loadingMessage : 'Confirmer et Sauvegarder'}
           onPress={handleConfirm}
           disabled={loading}
         />
