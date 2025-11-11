@@ -1,14 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { N8nAnalysisResponse } from '@/types';
 
+const BASE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_N8N_WEBHOOK_BASE_URL ||
+  process.env.EXPO_PUBLIC_N8N_WEBHOOK_BASE_URL ||
+  'http://82.165.218.187:5678/webhook';
+
 const WORKFLOW_URLS = [
-  'http://82.165.218.187:5678/webhook/analyse_1',
-  'http://82.165.218.187:5678/webhook/analyse_2',
-  'http://82.165.218.187:5678/webhook/analyse_3',
-  'http://82.165.218.187:5678/webhook/analyse_4',
-  'http://82.165.218.187:5678/webhook/analyse_5',
-  'http://82.165.218.187:5678/webhook/analyse_6',
-  'http://82.165.218.187:5678/webhook/analyse_7',
+  `${BASE_URL}/analyse_1`,
+  `${BASE_URL}/analyse_2`,
+  `${BASE_URL}/analyse_3`,
+  `${BASE_URL}/analyse_4`,
+  `${BASE_URL}/analyse_5`,
+  `${BASE_URL}/analyse_6`,
+  `${BASE_URL}/analyse_7`,
 ];
 
 const ROUND_ROBIN_KEY = '@n8n_round_robin_counter';

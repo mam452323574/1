@@ -21,18 +21,10 @@ function RootLayoutNav() {
   const lastNavigationTime = useRef<number>(0);
 
   useEffect(() => {
-    if (loading) {
-      console.log('[Navigation] Still loading auth state...');
-      return;
-    }
-
-    if (isNavigating || isSigningOut) {
-      console.log('[Navigation] Navigation in progress, skipping...');
-      return;
-    }
+    if (loading) return;
+    if (isNavigating || isSigningOut) return;
 
     if (!hasInitialized) {
-      console.log('[Navigation] Initial navigation setup');
       setHasInitialized(true);
     }
 
@@ -41,57 +33,53 @@ function RootLayoutNav() {
 
     if (timeSinceLastNav < 500) {
       navigationAttempts.current++;
-      console.warn(`[Navigation] Rapid navigation attempt #${navigationAttempts.current}`);
-
-      if (navigationAttempts.current >= 3) {
-        console.error('[Navigation] Too many rapid navigation attempts, blocking');
+      if (navigationAttempts.current >= 5) {
+        console.warn('[Navigation] Too many rapid attempts, blocking temporarily');
         return;
       }
     } else {
       navigationAttempts.current = 0;
     }
 
-    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy' || segments[0] === 'notifications' || segments[0] === 'notification-settings' || segments[0] === 'scan-detail' || segments[0] === 'scan-history' || segments[0] === 'scan-results' || segments[0] === 'trusted-devices' || segments[0] === 'premium-upgrade';
-    const inAuth = segments[0] === '(auth)';
-    const inUsernameSetup = segments[0] === '(auth)' && segments[1] === 'username-setup';
-    const inPremiumUpgrade = segments[0] === 'premium-upgrade';
-    const inEmailVerification = segments[0] === '(auth)' && segments[1] === 'email-verification';
-    const inLogin = segments[0] === '(auth)' && (segments[1] === 'login' || segments[1] === 'signup');
+    const AUTHENTICATED_ROUTES = [
+      '(tabs)', 'recipes', 'exercises', 'scan-preview', 'settings',
+      'premium-plan', 'privacy-policy', 'notifications', 'notification-settings',
+      'scan-detail', 'scan-history', 'scan-results', 'trusted-devices', 'premium-upgrade'
+    ];
 
-    const performNavigation = async (path: string, reason: string) => {
+    const firstSegment = segments[0] || '';
+    const secondSegment = segments[1] || '';
+
+    const inAuthGroup = AUTHENTICATED_ROUTES.includes(firstSegment);
+    const inAuth = firstSegment === '(auth)';
+    const inUsernameSetup = inAuth && secondSegment === 'username-setup';
+    const inEmailVerification = inAuth && secondSegment === 'email-verification';
+    const inLogin = inAuth && (secondSegment === 'login' || secondSegment === 'signup');
+
+    const performNavigation = async (path: string) => {
       try {
-        console.log(`[Navigation] ${reason} -> ${path}`);
         setIsNavigating(true);
         lastNavigationTime.current = now;
-
         await new Promise(resolve => setTimeout(resolve, 100));
-
         router.replace(path as any);
-
         setTimeout(() => {
           setIsNavigating(false);
           navigationAttempts.current = 0;
         }, 300);
       } catch (error) {
-        console.error('[Navigation] Navigation failed:', error);
+        console.error('[Navigation] Failed:', error);
         setIsNavigating(false);
       }
     };
 
-    if (pendingVerification && !inEmailVerification) {
-      console.log('[Navigation] Pending verification, staying on current flow');
-      return;
-    }
+    if (pendingVerification && !inEmailVerification) return;
 
     if (!user && !inAuth) {
-      performNavigation('/(auth)/login', 'No user detected');
+      performNavigation('/(auth)/login');
     } else if (user && !userProfile?.username && !inUsernameSetup && !pendingVerification) {
-      console.log('[Navigation] User missing username');
-      console.log('[Navigation] User ID:', user.id);
-      console.log('[Navigation] User Profile:', userProfile);
-      performNavigation('/(auth)/username-setup', 'Username setup required');
+      performNavigation('/(auth)/username-setup');
     } else if (user && userProfile?.username && !inAuthGroup && !inAuth) {
-      performNavigation('/(tabs)', 'User authenticated');
+      performNavigation('/(tabs)');
     }
   }, [user, userProfile, loading, segments, pendingVerification, isNavigating, hasInitialized, isSigningOut]);
 

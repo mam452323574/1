@@ -229,8 +229,6 @@ export interface Scan {
   image_url: string | null;
   analysis_result: N8nAnalysisResponse | null;
   created_at: string;
-  type?: string | null;
-  percentage?: number | null;
 }
 
 export interface ScanHistoryItem {

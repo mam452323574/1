@@ -9,7 +9,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { CameraGuide } from '@/components/CameraGuide';
 import { ApiService } from '@/services/api';
 import { ScanType, ScanLimitStatus } from '@/types';
-import { SCAN_TYPE_LABELS, MAX_SCANS_PER_TYPE } from '@/constants/scan';
+import { SCAN_TYPE_LABELS } from '@/constants/scan';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants/theme';
 
 export default function ScannerScreen() {

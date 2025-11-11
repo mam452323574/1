@@ -375,7 +375,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkUsernameAvailability = async (username: string): Promise<boolean> => {
-    return true;
+    if (!username || username.trim().length < 3) {
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('username', username.trim())
+        .maybeSingle();
+
+      if (error) {
+        console.error('[CheckUsername] Error checking availability:', error);
+        return false;
+      }
+
+      return !data;
+    } catch (error) {
+      console.error('[CheckUsername] Exception checking username:', error);
+      return false;
+    }
   };
 
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
