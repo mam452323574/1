@@ -19,13 +19,20 @@ export default function ScanHistoryScreen() {
 
   const fetchHistory = async () => {
     try {
+      console.log('[ScanHistory] fetchHistory called with selectedType:', selectedType);
       setError(null);
       const scanType = selectedType === 'all' ? undefined : selectedType;
+      console.log('[ScanHistory] Calling ApiService.getScanHistory...');
       const data = await ApiService.getScanHistory(scanType);
-      setScans(data);
+      console.log('[ScanHistory] Received scan history data:', data?.length || 0, 'items');
+      setScans(data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement');
+      console.error('[ScanHistory] Error fetching history:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement';
+      console.error('[ScanHistory] Error message:', errorMessage);
+      setError(errorMessage);
     } finally {
+      console.log('[ScanHistory] fetchHistory completed');
       setLoading(false);
       setRefreshing(false);
     }
@@ -41,13 +48,21 @@ export default function ScanHistoryScreen() {
   };
 
   const handleScanPress = (scan: ScanHistoryItem) => {
-    if (scan.scan_type === 'nutrition' && scan.analysis_result) {
-      router.push({
-        pathname: '/scan-detail',
-        params: {
-          scanId: scan.id,
-        },
-      });
+    try {
+      console.log('[ScanHistory] Scan pressed:', scan.id, scan.scan_type);
+      if (scan.scan_type === 'nutrition' && scan.analysis_result) {
+        console.log('[ScanHistory] Navigating to scan-detail...');
+        router.push({
+          pathname: '/scan-detail',
+          params: {
+            scanId: scan.id,
+          },
+        });
+      } else {
+        console.log('[ScanHistory] Scan not clickable - not nutrition or no analysis');
+      }
+    } catch (err) {
+      console.error('[ScanHistory] Error in handleScanPress:', err);
     }
   };
 
@@ -163,9 +178,9 @@ export default function ScanHistoryScreen() {
                     <Text style={styles.scanDate}>{formatDate(scan.created_at)}</Text>
                     <Text style={styles.scanTime}>{formatTime(scan.created_at)}</Text>
 
-                    {scan.scan_type === 'nutrition' && scan.analysis_result && (
+                    {scan.scan_type === 'nutrition' && scan.analysis_result && scan.analysis_result.totals && (
                       <Text style={styles.scanCalories}>
-                        {Math.round(scan.analysis_result.totals.kcal)} kcal
+                        {Math.round(scan.analysis_result.totals.kcal || 0)} kcal
                       </Text>
                     )}
                   </View>

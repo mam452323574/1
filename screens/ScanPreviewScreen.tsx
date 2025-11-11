@@ -21,9 +21,15 @@ export default function ScanPreviewScreen() {
   const { setBadge } = useBadges();
 
   const handleConfirm = async () => {
-    console.log('[ScanPreview] handleConfirm called');
+    console.log('[ScanPreview] ========== START handleConfirm ==========');
     console.log('[ScanPreview] imageUri:', imageUri);
     console.log('[ScanPreview] scanType:', scanType);
+
+    if (!imageUri || !scanType) {
+      console.error('[ScanPreview] Missing required params!');
+      Alert.alert('Erreur', 'Données manquantes pour le scan');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -31,19 +37,22 @@ export default function ScanPreviewScreen() {
 
       if (scanType === 'nutrition') {
         setLoadingMessage('Analyse en cours...');
-        console.log('[ScanPreview] Nutrition scan detected, loading message updated');
+        console.log('[ScanPreview] Nutrition scan - loading message updated');
+      } else {
+        setLoadingMessage('Enregistrement en cours...');
       }
 
-      console.log('[ScanPreview] Calling ApiService.createScan...');
+      console.log('[ScanPreview] ========== Calling ApiService.createScan ==========');
       const scanData = await ApiService.createScan(imageUri, scanType);
-      console.log('[ScanPreview] Scan created successfully:', scanData);
+      console.log('[ScanPreview] ========== Scan created successfully ==========');
+      console.log('[ScanPreview] Scan data:', JSON.stringify(scanData, null, 2));
 
       setShowConfetti(true);
       setBadge('analytics');
-      console.log('[ScanPreview] Confetti triggered, badge set');
+      console.log('[ScanPreview] Confetti triggered, badge set to analytics');
 
       setTimeout(() => {
-        console.log('[ScanPreview] Timeout callback executing...');
+        console.log('[ScanPreview] Timeout callback executing (1500ms delay)...');
         if (scanType === 'nutrition' && scanData.analysis_result) {
           console.log('[ScanPreview] Navigating to scan-results with analysis data');
           router.replace({
@@ -54,22 +63,32 @@ export default function ScanPreviewScreen() {
             },
           });
         } else {
-          console.log('[ScanPreview] Non-nutrition scan or no analysis result, showing alert');
-          Alert.alert('Succès', 'Votre scan a bien été enregistré', [
-            {
-              text: 'OK',
-              onPress: () => router.push('/(tabs)'),
-            },
-          ]);
+          console.log('[ScanPreview] Non-nutrition scan or no analysis result');
+          console.log('[ScanPreview] Showing success alert and navigating to home');
+          Alert.alert(
+            'Succès',
+            'Votre scan a bien été enregistré ! Consultez l\'onglet Analyses pour voir vos statistiques.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  console.log('[ScanPreview] User pressed OK, navigating to home tab');
+                  router.replace('/(tabs)');
+                },
+              },
+            ]
+          );
         }
       }, 1500);
     } catch (err) {
-      console.error('[ScanPreview] Error in handleConfirm:', err);
+      console.error('[ScanPreview] ========== ERROR in handleConfirm ==========');
+      console.error('[ScanPreview] Error object:', err);
       console.error('[ScanPreview] Error stack:', err instanceof Error ? err.stack : 'No stack trace');
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
-      console.error('[ScanPreview] Displaying error alert:', errorMessage);
+      console.error('[ScanPreview] Error message:', errorMessage);
 
-      if (errorMessage.includes('Limite') && errorMessage.includes('atteinte')) {
+      if (errorMessage.includes('Limite') || errorMessage.includes('atteinte') || errorMessage.includes('Prochain scan')) {
+        console.log('[ScanPreview] Limit error detected, showing upgrade option');
         Alert.alert(
           'Limite atteinte',
           errorMessage,
@@ -78,17 +97,20 @@ export default function ScanPreviewScreen() {
             {
               text: 'Passer à Premium',
               onPress: () => {
+                console.log('[ScanPreview] User chose to upgrade to premium');
                 router.push('/premium-plan');
               },
             },
           ]
         );
       } else {
+        console.log('[ScanPreview] Generic error, showing error alert');
         Alert.alert('Erreur', errorMessage);
       }
 
       setLoading(false);
     }
+    console.log('[ScanPreview] ========== END handleConfirm ==========');
   };
 
   return (

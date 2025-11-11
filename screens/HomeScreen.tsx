@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, FlatList } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Heart, UtensilsCrossed, Dumbbell } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,15 +32,20 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = async () => {
+    console.log('[HomeScreen] fetchData called');
     try {
       setError(null);
+      console.log('[HomeScreen] Fetching dashboard data and scan limits...');
       const [dashboardData, limits] = await Promise.all([
         ApiService.getDashboard(),
         ApiService.getScanLimits(),
       ]);
+      console.log('[HomeScreen] Dashboard data received:', dashboardData);
+      console.log('[HomeScreen] Scan limits received:', limits);
       setData(dashboardData);
       setScanLimits(limits);
     } catch (err) {
+      console.error('[HomeScreen] Error fetching data:', err);
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     } finally {
       setLoading(false);
@@ -48,9 +54,18 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
+    console.log('[HomeScreen] Initial mount - fetching data');
     fetchData();
     checkForAchievements();
-  }, [checkForAchievements]);
+  }, []);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[HomeScreen] Screen focused - refreshing data');
+      fetchData();
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
