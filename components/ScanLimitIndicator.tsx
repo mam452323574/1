@@ -19,7 +19,7 @@ export function ScanLimitIndicator({ limitStatus, maxScans = 3 }: ScanLimitIndic
             key={index}
             style={[
               styles.dot,
-              index < limitStatus.currentCount && styles.dotUsed,
+              index < remaining && styles.dotUsed,
             ]}
           />
         ))}

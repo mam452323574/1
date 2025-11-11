@@ -63,14 +63,6 @@ export default function AnalyticsScreen() {
           console.error('[AnalyticsScreen] Error fetching nutrition history:', nutritionResult.reason);
         }
 
-        if (analyticsResult.status === 'rejected' && nutritionResult.status === 'rejected') {
-          const errorMessage = 'Impossible de charger les données';
-          console.error('[AnalyticsScreen] Both requests failed, setting error message');
-          if (mounted) {
-            setError(errorMessage);
-          }
-        }
-
         console.log('[AnalyticsScreen] All data fetched successfully');
       } catch (err) {
         console.error('[AnalyticsScreen] Error in fetchData:', err);
@@ -98,10 +90,6 @@ export default function AnalyticsScreen() {
 
   if (loading) {
     return <LoadingSpinner />;
-  }
-
-  if (error) {
-    return <ErrorMessage message={error} />;
   }
 
   const hasHealthData = data && data.healthScoreHistory.length > 0;

@@ -128,6 +128,92 @@ export class ApiService {
     return data || [];
   }
 
+  static async syncScanLimits(): Promise<void> {
+    console.log('[ApiService.syncScanLimits] Starting scan limits synchronization...');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.error('[ApiService.syncScanLimits] No user found');
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('account_tier')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        console.error('[ApiService.syncScanLimits] No profile found');
+        return;
+      }
+
+      const accountTier = profile.account_tier as 'free' | 'premium';
+      const scanTypes: ScanType[] = ['health', 'body', 'nutrition'];
+      const syncedUsage: any = {
+        health: { last_scan_date: null, scan_timestamps: [] },
+        body: { last_scan_date: null, scan_timestamps: [] },
+        nutrition: { last_scan_date: null, scan_timestamps: [] },
+      };
+
+      const now = Date.now();
+      const limits = {
+        free: {
+          health: { count: 1, periodMs: 7 * 24 * 60 * 60 * 1000 },
+          body: { count: 1, periodMs: 30 * 24 * 60 * 60 * 1000 },
+          nutrition: { count: 1, periodMs: 3 * 24 * 60 * 60 * 1000 },
+        },
+        premium: {
+          health: { count: 3, periodMs: 24 * 60 * 60 * 1000 },
+          body: { count: 3, periodMs: 24 * 60 * 60 * 1000 },
+          nutrition: { count: 3, periodMs: 24 * 60 * 60 * 1000 },
+        },
+      };
+
+      for (const scanType of scanTypes) {
+        const limit = limits[accountTier][scanType];
+        const cutoffTime = new Date(now - limit.periodMs).toISOString();
+
+        console.log(`[syncScanLimits] Syncing ${scanType} scans since ${cutoffTime}`);
+
+        const { data: scans } = await supabase
+          .from('scans')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .eq('scan_type', scanType)
+          .gte('created_at', cutoffTime)
+          .order('created_at', { ascending: true });
+
+        if (scans && scans.length > 0) {
+          const timestamps = scans.map(scan => scan.created_at);
+          syncedUsage[scanType] = {
+            last_scan_date: timestamps[timestamps.length - 1],
+            scan_timestamps: timestamps.slice(-limit.count),
+          };
+          console.log(`[syncScanLimits] Found ${scans.length} ${scanType} scans in period`);
+        } else {
+          console.log(`[syncScanLimits] No ${scanType} scans found in period`);
+        }
+      }
+
+      console.log('[syncScanLimits] Updating user profile with synced data...');
+
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ scan_usage: syncedUsage })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('[syncScanLimits] Update error:', updateError);
+      } else {
+        console.log('[syncScanLimits] Successfully synced scan limits');
+      }
+    } catch (error) {
+      console.error('[ApiService.syncScanLimits] Error:', error);
+    }
+  }
+
   static async getScanLimits(): Promise<Record<ScanType, ScanLimitStatus>> {
     const scanTypes: ScanType[] = ['body', 'health', 'nutrition'];
     const results: Record<ScanType, ScanLimitStatus> = {} as any;

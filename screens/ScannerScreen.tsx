@@ -27,6 +27,7 @@ export default function ScannerScreen() {
 
   const fetchScanLimits = async () => {
     try {
+      await ApiService.syncScanLimits();
       const limits = await ApiService.getScanLimits();
       setScanLimits(limits);
     } catch (err) {

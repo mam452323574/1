@@ -35,6 +35,8 @@ export default function HomeScreen() {
     console.log('[HomeScreen] fetchData called');
     try {
       setError(null);
+      console.log('[HomeScreen] Syncing scan limits...');
+      await ApiService.syncScanLimits();
       console.log('[HomeScreen] Fetching dashboard data and scan limits...');
       const [dashboardData, limits] = await Promise.all([
         ApiService.getDashboard(),
