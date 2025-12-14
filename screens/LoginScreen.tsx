@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Heart } from 'lucide-react-native';
+import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
 import { OAuthButton } from '@/components/OAuthButton';
@@ -9,9 +9,10 @@ import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, signInWithOAuth } = useAuth();
+  const { signIn, signInWithOAuth, sendVerificationEmail, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,9 +26,22 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       setError(null);
-      await signIn(email, password);
+      const { needsVerification, userId } = await signIn(email, password);
+
+      if (needsVerification) {
+        await sendVerificationEmail(email, userId, 'login');
+        router.push({
+          pathname: '/email-verification',
+          params: { email, userId, type: 'login' },
+        });
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur de connexion');
+      const errorMessage = err instanceof Error ? err.message : 'Erreur de connexion';
+      if (errorMessage.includes('Invalid login credentials')) {
+        setError('Email ou mot de passe incorrect');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -82,31 +96,47 @@ export default function LoginScreen() {
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="votre@email.com"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              placeholderTextColor={COLORS.gray}
-            />
-          </View>
+              <Text style={styles.label}>Email</Text>
+              <View style={styles.inputWithIcon}>
+                <Mail color={COLORS.gray} size={20} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.inputWithPadding}
+                  placeholder="votre@email.com"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  placeholderTextColor={COLORS.gray}
+                />
+              </View>
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mot de passe</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="password"
-              placeholderTextColor={COLORS.gray}
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Mot de passe</Text>
+              <View style={styles.inputWithIcon}>
+                <Lock color={COLORS.gray} size={20} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.inputWithPadding}
+                  placeholder="Entrez votre mot de passe"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoComplete="password"
+                  placeholderTextColor={COLORS.gray}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIcon}
+                >
+                  {showPassword ? (
+                    <EyeOff color={COLORS.gray} size={20} />
+                  ) : (
+                    <Eye color={COLORS.gray} size={20} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
 
           {error && (
             <View style={styles.errorContainer}>
@@ -200,14 +230,27 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     marginBottom: SPACING.sm,
   },
-  input: {
+  inputWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    fontSize: SIZES.md,
     borderWidth: 1,
     borderColor: COLORS.lightGray,
+    paddingHorizontal: SPACING.md,
+  },
+  inputIcon: {
+    marginRight: SPACING.sm,
+  },
+  inputWithPadding: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    fontSize: SIZES.md,
     color: COLORS.darkGray,
+  },
+  eyeIcon: {
+    padding: SPACING.sm,
+    marginLeft: SPACING.xs,
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',

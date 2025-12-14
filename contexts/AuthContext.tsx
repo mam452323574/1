@@ -14,18 +14,20 @@ interface AuthContextType {
   session: Session | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, username: string, avatarUrl?: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ needsVerification: boolean; userId: string }>;
+  signUp: (email: string, password: string) => Promise<{ userId: string; email: string }>;
+  completeSignUp: (userId: string, username: string, avatarUrl?: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
   signOut: () => Promise<void>;
   checkUsernameAvailability: (username: string) => Promise<boolean>;
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
   isDisposableEmail: (email: string) => Promise<boolean>;
-  sendVerificationEmail: (email: string, userId: string) => Promise<string>;
-  verifyEmailCode: (code: string, userId: string) => Promise<boolean>;
+  sendVerificationEmail: (email: string, userId: string, type?: 'signup' | 'login') => Promise<void>;
+  verifyEmailCode: (code: string, userId: string, type?: 'signup' | 'login') => Promise<boolean>;
   checkTrustedDevice: (deviceFingerprint: string, userId: string) => Promise<boolean>;
   addTrustedDevice: (deviceFingerprint: string, deviceName: string, userId: string) => Promise<void>;
+  cleanupOrphanUser: (userId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,22 +88,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+  const signIn = async (email: string, password: string): Promise<{ needsVerification: boolean; userId: string }> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
+
+    const userId = data.user.id;
+
+    const { getDeviceFingerprint } = await import('@/services/deviceFingerprint');
+    const fingerprint = await getDeviceFingerprint();
+    const isTrusted = await checkTrustedDevice(fingerprint, userId);
+
+    if (!isTrusted) {
+      return { needsVerification: true, userId };
+    }
+
+    return { needsVerification: false, userId };
   };
 
-  const signUp = async (email: string, password: string, username: string, avatarUrl?: string) => {
-    console.log('[SignUp] Starting signup process for username:', username);
-
-    const isAvailable = await checkUsernameAvailability(username);
-    if (!isAvailable) {
-      throw new Error('Ce nom d\'utilisateur est déjà pris. Veuillez en choisir un autre.');
-    }
+  const signUp = async (email: string, password: string): Promise<{ userId: string; email: string }> => {
+    console.log('[SignUp] Starting signup process for email:', email);
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -110,54 +119,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) throw error;
 
-    if (data.user) {
-      try {
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: data.user.id,
-            email: data.user.email!,
-            username,
-            avatar_url: avatarUrl || null,
-            account_tier: 'free',
-          });
+    if (!data.user) {
+      throw new Error('Erreur lors de la creation du compte');
+    }
 
-        if (profileError) {
-          if (profileError.code === '23505') {
-            await supabase.auth.admin.deleteUser(data.user.id);
-            throw new Error('Ce nom d\'utilisateur a été pris pendant la création du compte. Veuillez réessayer.');
-          }
-          throw profileError;
-        }
+    console.log('[SignUp] Auth user created, awaiting email verification');
+    return { userId: data.user.id, email: data.user.email! };
+  };
 
-        await supabase.from('oauth_connections').insert({
-          user_id: data.user.id,
-          provider: 'email',
-          provider_user_id: data.user.id,
-          provider_email: email,
+  const completeSignUp = async (userId: string, username: string, avatarUrl?: string) => {
+    console.log('[SignUp] Completing signup for user:', userId);
+
+    const isAvailable = await checkUsernameAvailability(username);
+    if (!isAvailable) {
+      throw new Error('Ce nom d\'utilisateur est deja pris. Veuillez en choisir un autre.');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id !== userId) {
+      throw new Error('Session invalide');
+    }
+
+    try {
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: userId,
+          email: user.email!,
+          username,
+          avatar_url: avatarUrl || null,
+          account_tier: 'free',
+          email_verified: true,
         });
 
-        const today = new Date().toISOString().split('T')[0];
-        await supabase.from('health_scores').insert({
-          user_id: data.user.id,
-          score: 50,
-          calories_current: 0,
-          calories_goal: 2000,
-          bodyfat: 20,
-          muscle: 40,
-          date: today,
-        });
-
-        console.log('[SignUp] Signup completed successfully');
-      } catch (profileError) {
-        console.error('[SignUp] Profile creation failed, cleaning up auth user:', profileError);
-        try {
-          await supabase.auth.signOut();
-        } catch (cleanupError) {
-          console.error('[SignUp] Cleanup error:', cleanupError);
+      if (profileError) {
+        if (profileError.code === '23505') {
+          throw new Error('Ce nom d\'utilisateur a ete pris. Veuillez en choisir un autre.');
         }
         throw profileError;
       }
+
+      await supabase.from('oauth_connections').insert({
+        user_id: userId,
+        provider: 'email',
+        provider_user_id: userId,
+        provider_email: user.email,
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      await supabase.from('health_scores').insert({
+        user_id: userId,
+        score: 50,
+        calories_current: 0,
+        calories_goal: 2000,
+        bodyfat: 20,
+        muscle: 40,
+        date: today,
+      });
+
+      await loadUserProfile(userId);
+      console.log('[SignUp] Signup completed successfully');
+    } catch (profileError) {
+      console.error('[SignUp] Profile creation failed:', profileError);
+      throw profileError;
     }
   };
 
@@ -423,7 +447,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return !!data;
   };
 
-  const sendVerificationEmail = async (email: string, userId: string): Promise<string> => {
+  const sendVerificationEmail = async (email: string, userId: string, type: 'signup' | 'login' = 'signup'): Promise<void> => {
     try {
       console.log('[Verification] Sending verification email to:', email);
 
@@ -435,63 +459,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email, userId }),
+          body: JSON.stringify({ email, userId, type }),
         }
       );
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to send verification email');
+        throw new Error(data.error || 'Echec de l\'envoi du code de verification');
       }
 
-      const data = await response.json();
       console.log('[Verification] Email sent successfully');
-      return data.devCode || '';
     } catch (error) {
       console.error('[Verification] Error sending email:', error);
       throw error;
     }
   };
 
-  const verifyEmailCode = async (code: string, userId: string): Promise<boolean> => {
+  const verifyEmailCode = async (code: string, userId: string, type: 'signup' | 'login' = 'signup'): Promise<boolean> => {
     try {
       console.log('[Verification] Verifying code for user:', userId);
 
-      const { data, error } = await supabase
-        .from('verification_codes')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('code', code)
-        .is('verified_at', null)
-        .gt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-email-code`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ code, userId, type }),
+        }
+      );
 
-      if (error) {
-        console.error('[Verification] Error fetching code:', error);
-        return false;
-      }
+      const data = await response.json();
 
-      if (!data) {
-        console.log('[Verification] Code not found or expired');
-        return false;
-      }
-
-      const { error: updateError } = await supabase
-        .from('verification_codes')
-        .update({ verified_at: new Date().toISOString() })
-        .eq('id', data.id);
-
-      if (updateError) {
-        console.error('[Verification] Error marking code as verified:', updateError);
-        return false;
+      if (!response.ok) {
+        console.error('[Verification] Error:', data.error);
+        throw new Error(data.error || 'Code incorrect');
       }
 
       console.log('[Verification] Code verified successfully');
-      return true;
+      return data.verified === true;
     } catch (error) {
       console.error('[Verification] Error verifying code:', error);
-      return false;
+      throw error;
     }
   };
 
@@ -555,6 +567,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const cleanupOrphanUser = async (userId: string): Promise<void> => {
+    try {
+      console.log('[Cleanup] Cleaning up orphan user:', userId);
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/cleanup-orphan-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        console.error('[Cleanup] Error:', data.error);
+      }
+
+      await supabase.auth.signOut();
+      console.log('[Cleanup] Orphan user cleaned up');
+    } catch (error) {
+      console.error('[Cleanup] Error:', error);
+    }
+  };
+
   const signOut = async () => {
     try {
       console.log('[SignOut] Starting complete cleanup...');
@@ -599,6 +639,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signIn,
       signUp,
+      completeSignUp,
       signInWithOAuth,
       signOut,
       checkUsernameAvailability,
@@ -609,6 +650,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyEmailCode,
       checkTrustedDevice,
       addTrustedDevice,
+      cleanupOrphanUser,
     }}>
       {children}
     </AuthContext.Provider>

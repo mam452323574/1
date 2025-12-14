@@ -1,128 +1,37 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Heart, Check, X, AlertCircle } from 'lucide-react-native';
+import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
-import { AvatarPicker } from '@/components/AvatarPicker';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const { signUp, checkUsernameAvailability, isDisposableEmail } = useAuth();
+  const { signUp, sendVerificationEmail, isDisposableEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'network_error' | 'timeout'>('idle');
-  const [checkTimeout, setCheckTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (checkTimeout) {
-      clearTimeout(checkTimeout);
-    }
-
-    if (!username) {
-      setUsernameStatus('idle');
-      return;
-    }
-
-    if (username.length < 3 || username.length > 20) {
-      setUsernameStatus('invalid');
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-      setUsernameStatus('invalid');
-      return;
-    }
-
-    setUsernameStatus('checking');
-
-    const timeout = setTimeout(async () => {
-      try {
-        console.log('[Username Check] Starting validation for:', username);
-        const isAvailable = await checkUsernameAvailability(username);
-        console.log('[Username Check] Result:', isAvailable ? 'available' : 'taken');
-        setUsernameStatus(isAvailable ? 'available' : 'taken');
-      } catch (error) {
-        console.error('[Username Check] Error:', error);
-        const errorMessage = error instanceof Error ? error.message : '';
-        if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-          setUsernameStatus('network_error');
-        } else if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
-          setUsernameStatus('timeout');
-        } else {
-          setUsernameStatus('network_error');
-        }
-      }
-    }, 500);
-
-    setCheckTimeout(timeout);
-
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [username]);
-
-  const validateUsername = (text: string) => {
-    const cleaned = text.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-    setUsername(cleaned);
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   const handleSignUp = async () => {
     setError(null);
 
-    if (!email || !password || !confirmPassword || !username) {
-      setError('Veuillez remplir tous les champs obligatoires');
+    if (!email || !password || !confirmPassword) {
+      setError('Veuillez remplir tous les champs');
       return;
     }
 
-    if (username.length < 3 || username.length > 20) {
-      setError('Le nom d\'utilisateur doit contenir entre 3 et 20 caractères');
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-      setError('Le nom d\'utilisateur ne peut contenir que des lettres, chiffres, _ ou -');
-      return;
-    }
-
-    if (usernameStatus === 'checking') {
-      setError('Vérification du nom d\'utilisateur en cours, veuillez patienter');
-      return;
-    }
-
-    if (usernameStatus === 'network_error' || usernameStatus === 'timeout') {
-      try {
-        console.log('[SignUp] Retrying username verification before signup...');
-        setUsernameStatus('checking');
-        const isAvailable = await checkUsernameAvailability(username);
-        if (!isAvailable) {
-          setError('Ce nom d\'utilisateur est déjà pris');
-          setUsernameStatus('taken');
-          return;
-        }
-        setUsernameStatus('available');
-        console.log('[SignUp] Username verified successfully');
-      } catch (err) {
-        console.error('[SignUp] Final verification failed:', err);
-        setError('Impossible de vérifier la disponibilité du nom d\'utilisateur. Veuillez vérifier votre connexion et réessayer.');
-        setUsernameStatus('network_error');
-        return;
-      }
-    }
-
-    if (usernameStatus === 'taken') {
-      setError('Ce nom d\'utilisateur est déjà pris, veuillez en choisir un autre');
-      return;
-    }
-
-    if (usernameStatus !== 'available') {
-      setError('Veuillez choisir un nom d\'utilisateur valide et disponible');
+    if (!validateEmail(email)) {
+      setError('Veuillez entrer une adresse email valide');
       return;
     }
 
@@ -132,7 +41,7 @@ export default function SignUpScreen() {
     }
 
     if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères');
+      setError('Le mot de passe doit contenir au moins 6 caracteres');
       return;
     }
 
@@ -142,69 +51,27 @@ export default function SignUpScreen() {
 
       const isDisposable = await isDisposableEmail(email);
       if (isDisposable) {
-        setError('Les adresses email temporaires ne sont pas autorisées');
+        setError('Les adresses email temporaires ne sont pas autorisees');
         return;
       }
 
-      await signUp(email, password, username, avatarUrl || undefined);
+      const { userId, email: userEmail } = await signUp(email, password);
+
+      await sendVerificationEmail(userEmail, userId, 'signup');
+
+      router.push({
+        pathname: '/email-verification',
+        params: { email: userEmail, userId, type: 'signup' },
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de l\'inscription');
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de l\'inscription';
+      if (errorMessage.includes('already registered')) {
+        setError('Cette adresse email est deja utilisee');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getUsernameStatusIcon = () => {
-    switch (usernameStatus) {
-      case 'checking':
-        return <ActivityIndicator size="small" color={COLORS.primary} />;
-      case 'available':
-        return <Check color={COLORS.success} size={20} />;
-      case 'taken':
-        return <X color={COLORS.error} size={20} />;
-      case 'invalid':
-        return <AlertCircle color={COLORS.error} size={20} />;
-      case 'network_error':
-      case 'timeout':
-        return <AlertCircle color={COLORS.warning} size={20} />;
-      default:
-        return null;
-    }
-  };
-
-  const getUsernameStatusText = () => {
-    switch (usernameStatus) {
-      case 'checking':
-        return 'Vérification de la disponibilité...';
-      case 'available':
-        return 'Disponible !';
-      case 'taken':
-        return 'Déjà pris, essayez un autre';
-      case 'invalid':
-        return '3-20 caractères : lettres, chiffres, _ ou -';
-      case 'network_error':
-        return 'Erreur réseau - Touchez pour réessayer';
-      case 'timeout':
-        return 'Délai d\'attente dépassé - Touchez pour réessayer';
-      default:
-        return '3-20 caractères : lettres, chiffres, _ ou -';
-    }
-  };
-
-  const getUsernameStatusColor = () => {
-    switch (usernameStatus) {
-      case 'checking':
-        return COLORS.primary;
-      case 'available':
-        return COLORS.success;
-      case 'taken':
-      case 'invalid':
-        return COLORS.error;
-      case 'network_error':
-      case 'timeout':
-        return COLORS.warning;
-      default:
-        return COLORS.gray;
     }
   };
 
@@ -215,104 +82,81 @@ export default function SignUpScreen() {
     >
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
-        <View style={styles.header}>
-          <Heart color={COLORS.primary} size={48} fill={COLORS.primary} />
-          <Text style={styles.title}>Health Scan</Text>
-          <Text style={styles.subtitle}>Créez votre compte</Text>
-        </View>
-
-          <View style={styles.avatarSection}>
-            <AvatarPicker
-              userId="temp"
-              currentAvatarUrl={avatarUrl}
-              onAvatarSelected={setAvatarUrl}
-              size={100}
-            />
-            <Text style={styles.avatarHint}>Optionnel</Text>
+          <View style={styles.header}>
+            <Heart color={COLORS.primary} size={48} fill={COLORS.primary} />
+            <Text style={styles.title}>Health Scan</Text>
+            <Text style={styles.subtitle}>Creez votre compte</Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Nom d'utilisateur *</Text>
+              <Text style={styles.label}>Email</Text>
               <View style={styles.inputWithIcon}>
+                <Mail color={COLORS.gray} size={20} style={styles.inputIcon} />
                 <TextInput
-                  style={[styles.input, styles.inputWithStatus]}
-                  placeholder="pseudo123"
-                  value={username}
-                  onChangeText={validateUsername}
+                  style={styles.inputWithPadding}
+                  placeholder="votre@email.com"
+                  value={email}
+                  onChangeText={setEmail}
                   autoCapitalize="none"
-                  autoComplete="off"
+                  keyboardType="email-address"
+                  autoComplete="email"
                   placeholderTextColor={COLORS.gray}
                 />
-                <View style={styles.statusIcon}>
-                  {getUsernameStatusIcon()}
-                </View>
               </View>
-              <TouchableOpacity
-                onPress={async () => {
-                  if (usernameStatus === 'network_error' || usernameStatus === 'timeout') {
-                    setUsernameStatus('checking');
-                    try {
-                      const isAvailable = await checkUsernameAvailability(username);
-                      setUsernameStatus(isAvailable ? 'available' : 'taken');
-                    } catch (error) {
-                      console.error('[Manual Retry] Error:', error);
-                      const errorMessage = error instanceof Error ? error.message : '';
-                      if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
-                        setUsernameStatus('timeout');
-                      } else {
-                        setUsernameStatus('network_error');
-                      }
-                    }
-                  }
-                }}
-                disabled={usernameStatus !== 'network_error' && usernameStatus !== 'timeout'}
-              >
-                <Text style={[styles.statusText, { color: getUsernameStatusColor() }]}>
-                  {getUsernameStatusText()}
-                </Text>
-              </TouchableOpacity>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="votre@email.com"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-                placeholderTextColor={COLORS.gray}
-              />
+              <Text style={styles.label}>Mot de passe</Text>
+              <View style={styles.inputWithIcon}>
+                <Lock color={COLORS.gray} size={20} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.inputWithPadding}
+                  placeholder="Minimum 6 caracteres"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoComplete="password-new"
+                  placeholderTextColor={COLORS.gray}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIcon}
+                >
+                  {showPassword ? (
+                    <EyeOff color={COLORS.gray} size={20} />
+                  ) : (
+                    <Eye color={COLORS.gray} size={20} />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Mot de passe *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="password"
-              placeholderTextColor={COLORS.gray}
-            />
-          </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirmer le mot de passe *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              autoComplete="password"
-              placeholderTextColor={COLORS.gray}
-            />
-          </View>
+              <Text style={styles.label}>Confirmer le mot de passe</Text>
+              <View style={styles.inputWithIcon}>
+                <Lock color={COLORS.gray} size={20} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.inputWithPadding}
+                  placeholder="Retapez votre mot de passe"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  autoComplete="password-new"
+                  placeholderTextColor={COLORS.gray}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.eyeIcon}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff color={COLORS.gray} size={20} />
+                  ) : (
+                    <Eye color={COLORS.gray} size={20} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
 
             {error && (
               <View style={styles.errorContainer}>
@@ -320,11 +164,17 @@ export default function SignUpScreen() {
               </View>
             )}
 
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoText}>
+                Un code de verification sera envoye a votre adresse email.
+              </Text>
+            </View>
+
             <Button
-              title="S'inscrire"
+              title="Continuer"
               onPress={handleSignUp}
               loading={loading}
-              disabled={loading || !email || !password || !confirmPassword || !username || username.length < 3}
+              disabled={loading || !email || !password || !confirmPassword}
             />
 
             <TouchableOpacity
@@ -332,7 +182,7 @@ export default function SignUpScreen() {
               onPress={() => router.back()}
             >
               <Text style={styles.loginText}>
-                Déjà un compte?{' '}
+                Deja un compte?{' '}
                 <Text style={styles.loginLink}>Se connecter</Text>
               </Text>
             </TouchableOpacity>
@@ -362,7 +212,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xl,
   },
   title: {
     fontSize: SIZES.xxxl,
@@ -374,15 +224,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.md,
     color: COLORS.gray,
     marginTop: SPACING.sm,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  avatarHint: {
-    fontSize: SIZES.sm,
-    color: COLORS.gray,
-    marginTop: SPACING.xs,
   },
   form: {
     width: '100%',
@@ -397,29 +238,26 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   inputWithIcon: {
-    position: 'relative',
-  },
-  input: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    fontSize: SIZES.md,
     borderWidth: 1,
     borderColor: COLORS.lightGray,
+    paddingHorizontal: SPACING.md,
+  },
+  inputIcon: {
+    marginRight: SPACING.sm,
+  },
+  inputWithPadding: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    fontSize: SIZES.md,
     color: COLORS.darkGray,
   },
-  inputWithStatus: {
-    paddingRight: 40,
-  },
-  statusIcon: {
-    position: 'absolute',
-    right: SPACING.md,
-    top: '50%',
-    transform: [{ translateY: -10 }],
-  },
-  statusText: {
-    fontSize: SIZES.sm,
-    marginTop: SPACING.xs,
+  eyeIcon: {
+    padding: SPACING.sm,
+    marginLeft: SPACING.xs,
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',
@@ -429,6 +267,17 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: COLORS.error,
+    fontSize: SIZES.sm,
+    textAlign: 'center',
+  },
+  infoContainer: {
+    backgroundColor: `${COLORS.primary}10`,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.lg,
+  },
+  infoText: {
+    color: COLORS.darkGray,
     fontSize: SIZES.sm,
     textAlign: 'center',
   },

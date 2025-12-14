@@ -24,6 +24,7 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy' || segments[0] === 'notifications' || segments[0] === 'notification-settings';
     const inUsernameSetup = segments[0] === 'username-setup';
     const inPremiumUpgrade = segments[0] === 'premium-upgrade';
+    const inEmailVerification = segments[0] === 'email-verification';
     const inLogin = segments[0] === 'login' || segments[0] === 'signup';
 
     const now = Date.now();
@@ -70,17 +71,17 @@ function RootLayoutNav() {
       return;
     }
 
-    if (!user && !inLogin) {
+    if (!user && !inLogin && !inEmailVerification) {
       console.log('[Navigation] No user detected, redirecting to login');
       lastRedirectTime.current = now;
       router.replace('/login');
-    } else if (user && !userProfile?.username && !inUsernameSetup) {
+    } else if (user && !userProfile?.username && !inUsernameSetup && !inEmailVerification) {
       console.log('[Navigation] User missing username, redirecting to setup');
       console.log('[Navigation] User ID:', user.id);
       console.log('[Navigation] User Profile:', userProfile);
       lastRedirectTime.current = now;
       router.replace('/username-setup');
-    } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin) {
+    } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin && !inEmailVerification) {
       console.log('[Navigation] User authenticated, redirecting to tabs');
       lastRedirectTime.current = now;
       router.replace('/(tabs)');
@@ -91,6 +92,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="signup" />
+      <Stack.Screen name="email-verification" />
       <Stack.Screen name="username-setup" />
       <Stack.Screen name="premium-upgrade" options={{ presentation: 'modal' }} />
       <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
