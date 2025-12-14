@@ -1,76 +1,91 @@
-interface N8nNutritionAnalysisRequest {
+import { ScanType } from '@/types';
+
+interface N8nAnalysisRequest {
   imageUrl: string;
   userId: string;
-  scanType: 'food' | 'supplement';
+  scanType: ScanType;
 }
 
-interface N8nNutritionAnalysisResponse {
+interface N8nAnalysisResponse {
   success: boolean;
-  data?: {
-    productName: string;
-    brand?: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-    fiber?: number;
-    sugar?: number;
-    sodium?: number;
-    ingredients?: string[];
-    allergens?: string[];
-    nutritionScore?: number;
-    healthScore?: number;
-    recommendations?: string[];
-  };
+  data?: Record<string, unknown>;
   error?: string;
 }
 
-const N8N_WEBHOOK_URL = process.env.EXPO_PUBLIC_N8N_WEBHOOK_URL || '';
+const N8N_WEBHOOKS = [
+  'https://n8n.basedjew.com/webhook/analyse_1',
+  'https://n8n.basedjew.com/webhook/analyse_2',
+  'https://n8n.basedjew.com/webhook/analyse_3',
+  'https://n8n.basedjew.com/webhook/analyse_4',
+  'https://n8n.basedjew.com/webhook/analyse_5',
+  'https://n8n.basedjew.com/webhook/analyse_6',
+  'https://n8n.basedjew.com/webhook/analyse_7',
+];
+
+let currentWebhookIndex = 0;
 
 export class N8nWebhookService {
-  static async analyzeNutrition(
+  private static getNextWebhookUrl(): string {
+    const url = N8N_WEBHOOKS[currentWebhookIndex];
+    const webhookNumber = currentWebhookIndex + 1;
+    currentWebhookIndex = (currentWebhookIndex + 1) % N8N_WEBHOOKS.length;
+    console.log(`[N8n] Using webhook ${webhookNumber}/${N8N_WEBHOOKS.length}`);
+    return url;
+  }
+
+  static async analyzeScan(
     imageUrl: string,
     userId: string,
-    scanType: 'food' | 'supplement'
-  ): Promise<N8nNutritionAnalysisResponse> {
+    scanType: ScanType
+  ): Promise<N8nAnalysisResponse> {
     try {
-      console.log('[N8n] Starting nutrition analysis via webhook');
+      console.log('[N8n] Starting analysis via webhook');
       console.log('[N8n] Image URL:', imageUrl);
       console.log('[N8n] User ID:', userId);
       console.log('[N8n] Scan Type:', scanType);
 
-      if (!N8N_WEBHOOK_URL) {
-        console.error('[N8n] Webhook URL not configured');
-        throw new Error('N8n webhook URL is not configured');
-      }
+      const webhookUrl = this.getNextWebhookUrl();
 
-      const requestBody: N8nNutritionAnalysisRequest = {
+      const requestBody: N8nAnalysisRequest = {
         imageUrl,
         userId,
         scanType,
       };
 
-      console.log('[N8n] Sending request to webhook:', N8N_WEBHOOK_URL);
+      console.log('[N8n] Sending request to:', webhookUrl);
 
-      const response = await fetch(N8N_WEBHOOK_URL, {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.error('[N8n] Webhook request failed:', response.status, response.statusText);
         throw new Error(`Webhook request failed: ${response.statusText}`);
       }
 
-      const data: N8nNutritionAnalysisResponse = await response.json();
+      const data: N8nAnalysisResponse = await response.json();
       console.log('[N8n] Analysis completed successfully');
 
       return data;
     } catch (error) {
-      console.error('[N8n] Error analyzing nutrition:', error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('[N8n] Request timeout after 60 seconds');
+        return {
+          success: false,
+          error: 'Request timeout - analysis took too long',
+        };
+      }
+      console.error('[N8n] Error analyzing scan:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -82,12 +97,7 @@ export class N8nWebhookService {
     try {
       console.log('[N8n] Testing webhook connection');
 
-      if (!N8N_WEBHOOK_URL) {
-        console.error('[N8n] Webhook URL not configured');
-        return false;
-      }
-
-      const response = await fetch(N8N_WEBHOOK_URL, {
+      const response = await fetch(N8N_WEBHOOKS[0], {
         method: 'GET',
       });
 
@@ -102,4 +112,4 @@ export class N8nWebhookService {
   }
 }
 
-export type { N8nNutritionAnalysisRequest, N8nNutritionAnalysisResponse };
+export type { N8nAnalysisRequest, N8nAnalysisResponse };

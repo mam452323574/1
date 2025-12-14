@@ -269,7 +269,7 @@ export class ApiService {
     return data;
   }
 
-  static async analyzeScanWithN8n(scanId: string, imageUrl: string, scanType: 'food' | 'supplement') {
+  static async analyzeScanWithN8n(scanId: string, imageUrl: string, scanType: ScanType) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -279,7 +279,7 @@ export class ApiService {
     console.log('[API] Starting N8n analysis for scan:', scanId);
 
     try {
-      const analysisResult = await N8nWebhookService.analyzeNutrition(
+      const analysisResult = await N8nWebhookService.analyzeScan(
         imageUrl,
         user.id,
         scanType
@@ -309,8 +309,8 @@ export class ApiService {
     }
   }
 
-  static async createScanWithAnalysis(imageUri: string, scanType: 'food' | 'supplement') {
-    const scan = await this.createScan(imageUri, scanType as ScanType);
+  static async createScanWithAnalysis(imageUri: string, scanType: ScanType) {
+    const scan = await this.createScan(imageUri, scanType);
 
     try {
       const analyzedScan = await this.analyzeScanWithN8n(
