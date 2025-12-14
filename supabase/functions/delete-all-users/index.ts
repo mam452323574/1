@@ -42,6 +42,34 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    const adminSecret = Deno.env.get("ADMIN_SECRET");
+    if (!adminSecret) {
+      console.error("ADMIN_SECRET environment variable is not set");
+      return new Response(
+        JSON.stringify({ success: false, error: "Server configuration error" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const body = await req.json();
+    const { adminKey } = body;
+
+    if (!adminKey || adminKey !== adminSecret) {
+      console.warn("Unauthorized delete attempt - invalid admin key");
+      return new Response(
+        JSON.stringify({ success: false, error: "Unauthorized: Invalid admin credentials" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("Admin authentication successful, proceeding with deletion");
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 

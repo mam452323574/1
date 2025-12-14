@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import Constants from 'expo-constants';
 import { DashboardData, AnalyticsData, Product, ScanType, ScanLimitStatus, ScanEligibilityResponse } from '@/types';
 import { MAX_SCANS_PER_TYPE, RATE_LIMIT_HOURS, STORAGE_BUCKET_NAME } from '@/constants/scan';
+import { N8nWebhookService } from './n8nWebhook';
 
 const SUPABASE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL!;
 
@@ -266,5 +267,61 @@ export class ApiService {
 
     if (error) throw error;
     return data;
+  }
+
+  static async analyzeScanWithN8n(scanId: string, imageUrl: string, scanType: 'food' | 'supplement') {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('[API] Starting N8n analysis for scan:', scanId);
+
+    try {
+      const analysisResult = await N8nWebhookService.analyzeNutrition(
+        imageUrl,
+        user.id,
+        scanType
+      );
+
+      if (!analysisResult.success || !analysisResult.data) {
+        throw new Error(analysisResult.error || 'Analysis failed');
+      }
+
+      const { data: updateData, error: updateError } = await supabase
+        .from('scans')
+        .update({
+          analysis_result: analysisResult.data,
+          analyzed_at: new Date().toISOString(),
+        })
+        .eq('id', scanId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      console.log('[API] N8n analysis completed and saved');
+      return updateData;
+    } catch (error) {
+      console.error('[API] Error analyzing scan with N8n:', error);
+      throw error;
+    }
+  }
+
+  static async createScanWithAnalysis(imageUri: string, scanType: 'food' | 'supplement') {
+    const scan = await this.createScan(imageUri, scanType as ScanType);
+
+    try {
+      const analyzedScan = await this.analyzeScanWithN8n(
+        scan.id,
+        scan.image_url,
+        scanType
+      );
+      return analyzedScan;
+    } catch (error) {
+      console.error('[API] Analysis failed, returning scan without analysis:', error);
+      return scan;
+    }
   }
 }

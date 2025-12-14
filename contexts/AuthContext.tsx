@@ -22,6 +22,10 @@ interface AuthContextType {
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
   isDisposableEmail: (email: string) => Promise<boolean>;
+  sendVerificationEmail: (email: string, userId: string) => Promise<string>;
+  verifyEmailCode: (code: string, userId: string) => Promise<boolean>;
+  checkTrustedDevice: (deviceFingerprint: string, userId: string) => Promise<boolean>;
+  addTrustedDevice: (deviceFingerprint: string, deviceName: string, userId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -419,6 +423,138 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return !!data;
   };
 
+  const sendVerificationEmail = async (email: string, userId: string): Promise<string> => {
+    try {
+      console.log('[Verification] Sending verification email to:', email);
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-verification-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, userId }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to send verification email');
+      }
+
+      const data = await response.json();
+      console.log('[Verification] Email sent successfully');
+      return data.devCode || '';
+    } catch (error) {
+      console.error('[Verification] Error sending email:', error);
+      throw error;
+    }
+  };
+
+  const verifyEmailCode = async (code: string, userId: string): Promise<boolean> => {
+    try {
+      console.log('[Verification] Verifying code for user:', userId);
+
+      const { data, error } = await supabase
+        .from('verification_codes')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('code', code)
+        .is('verified_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[Verification] Error fetching code:', error);
+        return false;
+      }
+
+      if (!data) {
+        console.log('[Verification] Code not found or expired');
+        return false;
+      }
+
+      const { error: updateError } = await supabase
+        .from('verification_codes')
+        .update({ verified_at: new Date().toISOString() })
+        .eq('id', data.id);
+
+      if (updateError) {
+        console.error('[Verification] Error marking code as verified:', updateError);
+        return false;
+      }
+
+      console.log('[Verification] Code verified successfully');
+      return true;
+    } catch (error) {
+      console.error('[Verification] Error verifying code:', error);
+      return false;
+    }
+  };
+
+  const checkTrustedDevice = async (deviceFingerprint: string, userId: string): Promise<boolean> => {
+    try {
+      console.log('[TrustedDevice] Checking device:', deviceFingerprint);
+
+      const { data, error } = await supabase
+        .from('trusted_devices')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('device_fingerprint', deviceFingerprint)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[TrustedDevice] Error checking device:', error);
+        return false;
+      }
+
+      const isTrusted = !!data;
+      console.log('[TrustedDevice] Device trusted:', isTrusted);
+
+      if (isTrusted) {
+        await supabase
+          .from('trusted_devices')
+          .update({ last_used_at: new Date().toISOString() })
+          .eq('id', data.id);
+      }
+
+      return isTrusted;
+    } catch (error) {
+      console.error('[TrustedDevice] Error checking device:', error);
+      return false;
+    }
+  };
+
+  const addTrustedDevice = async (deviceFingerprint: string, deviceName: string, userId: string): Promise<void> => {
+    try {
+      console.log('[TrustedDevice] Adding device:', deviceName);
+
+      const { error } = await supabase
+        .from('trusted_devices')
+        .upsert({
+          user_id: userId,
+          device_fingerprint: deviceFingerprint,
+          device_name: deviceName,
+          last_used_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,device_fingerprint',
+        });
+
+      if (error) {
+        console.error('[TrustedDevice] Error adding device:', error);
+        throw error;
+      }
+
+      console.log('[TrustedDevice] Device added successfully');
+    } catch (error) {
+      console.error('[TrustedDevice] Error adding device:', error);
+      throw error;
+    }
+  };
+
   const signOut = async () => {
     try {
       console.log('[SignOut] Starting complete cleanup...');
@@ -469,6 +605,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUserProfile,
       refreshUserProfile,
       isDisposableEmail,
+      sendVerificationEmail,
+      verifyEmailCode,
+      checkTrustedDevice,
+      addTrustedDevice,
     }}>
       {children}
     </AuthContext.Provider>

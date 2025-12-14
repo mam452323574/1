@@ -159,3 +159,49 @@ export interface ScanLimitConfig {
   periodMs: number;
   label: string;
 }
+
+export interface VerificationCode {
+  id: string;
+  user_id: string;
+  email: string;
+  code: string;
+  expires_at: string;
+  verified_at: string | null;
+  created_at: string;
+}
+
+export interface TrustedDevice {
+  id: string;
+  user_id: string;
+  device_fingerprint: string;
+  device_name: string;
+  last_used_at: string;
+  created_at: string;
+}
+
+export interface N8nNutritionData {
+  productName: string;
+  brand?: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  sugar?: number;
+  sodium?: number;
+  ingredients?: string[];
+  allergens?: string[];
+  nutritionScore?: number;
+  healthScore?: number;
+  recommendations?: string[];
+}
+
+export interface Scan {
+  id: string;
+  user_id: string;
+  scan_type: ScanType;
+  image_url: string;
+  analysis_result?: N8nNutritionData | any;
+  analyzed_at?: string;
+  created_at: string;
+}

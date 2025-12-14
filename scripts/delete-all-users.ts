@@ -5,6 +5,13 @@ async function deleteAllUsers() {
     console.log('⚠️  WARNING: This will delete ALL users and their data!');
     console.log('Starting deletion process...\n');
 
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      console.error('❌ Error: ADMIN_SECRET environment variable is not set');
+      console.log('Please set ADMIN_SECRET in your .env file');
+      return;
+    }
+
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     const apiUrl = `${supabaseUrl}/functions/v1/delete-all-users`;
 
@@ -14,6 +21,9 @@ async function deleteAllUsers() {
         'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        adminKey: adminSecret,
+      }),
     });
 
     if (!response.ok) {
