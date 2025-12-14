@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.58.0';
+import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,95 +6,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-interface CleanupRequest {
-  userId: string;
-}
-
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Attention : on utilise le Service Role ici pour avoir le droit de supprimer des users
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+      auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const { userId }: CleanupRequest = await req.json();
+    const { userId } = await req.json();
+    if (!userId) throw new Error('UserId required');
 
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: 'userId is required' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    // Vérifier si déjà vérifié pour ne pas supprimer par erreur
+    const { data: profile } = await supabase.from('user_profiles').select('email_verified').eq('id', userId).maybeSingle();
+
+    if (profile?.email_verified) {
+      return new Response(JSON.stringify({ error: 'User already verified' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('id, email_verified')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (profile && profile.email_verified) {
-      return new Response(
-        JSON.stringify({ error: 'Cannot delete verified user' }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
+    // Suppression en cascade
     await supabase.from('verification_codes').delete().eq('user_id', userId);
     await supabase.from('trusted_devices').delete().eq('user_id', userId);
-    await supabase.from('oauth_connections').delete().eq('user_id', userId);
-    await supabase.from('health_scores').delete().eq('user_id', userId);
     await supabase.from('user_profiles').delete().eq('id', userId);
 
+    // Suppression Auth finale
     const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+    if (deleteError) throw deleteError;
 
-    if (deleteError) {
-      console.error('Error deleting auth user:', deleteError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to delete user from auth' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    console.log(`Orphan user ${userId} cleaned up successfully`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'User deleted successfully',
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    console.error(error);
+    return new Response(JSON.stringify({ error: 'Failed to cleanup' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
