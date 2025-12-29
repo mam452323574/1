@@ -151,6 +151,7 @@ export interface ScanEligibilityResponse {
   next_available_date?: number;
   current_count?: number;
   limit?: number;
+  scan_id?: string;
   error?: string;
 }
 

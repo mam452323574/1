@@ -9,10 +9,11 @@ interface FeatureComparisonListProps {
 
 export function FeatureComparisonList({ features }: FeatureComparisonListProps) {
   const groupedFeatures = features.reduce((acc, feature) => {
-    if (!acc[feature.category]) {
-      acc[feature.category] = [];
+    const category = feature.category || 'General';
+    if (!acc[category]) {
+      acc[category] = [];
     }
-    acc[feature.category].push(feature);
+    acc[category].push(feature);
     return acc;
   }, {} as Record<string, PremiumFeature[]>);
 

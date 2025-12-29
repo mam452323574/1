@@ -4,6 +4,7 @@ export const COLORS = {
   primaryText: '#1D1D1F',
   secondaryText: '#FFFFFF',
   accentGreen: '#34C759',
+  accent: '#007AFF',
   lightGray: '#E5E5EA',
   gray: '#8E8E93',
   darkGray: '#424242',
@@ -23,6 +24,7 @@ export const FONTS = {
 
 export const FONT_WEIGHTS = {
   regular: '400' as const,
+  medium: '500' as const,
   semiBold: '600' as const,
   bold: '700' as const,
 };
@@ -40,6 +42,7 @@ export const SIZES = {
   text14: 14,
   text16: 16,
   text18: 18,
+  text20: 20,
   scoreNumber: 48,
   scoreSub: 14,
 };

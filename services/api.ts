@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import Constants from 'expo-constants';
-import { DashboardData, AnalyticsData, Product, ScanType, ScanLimitStatus, ScanEligibilityResponse } from '@/types';
-import { MAX_SCANS_PER_TYPE, RATE_LIMIT_HOURS, STORAGE_BUCKET_NAME } from '@/constants/scan';
+import { DashboardData, AnalyticsData, Product, ScanType, ScanEligibilityResponse } from '@/types';
+import { STORAGE_BUCKET_NAME } from '@/constants/scan';
 import { N8nWebhookService } from './n8nWebhook';
 
 const SUPABASE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL!;
@@ -117,74 +117,6 @@ export class ApiService {
     return data || [];
   }
 
-  /**
-   * @deprecated Use checkScanEligibility instead - this uses server-side validation
-   */
-  static async checkScanLimit(scanType: ScanType): Promise<ScanLimitStatus> {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const hoursAgo = new Date();
-    hoursAgo.setHours(hoursAgo.getHours() - RATE_LIMIT_HOURS);
-
-    const { count, error } = await supabase
-      .from('scans')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('scan_type', scanType)
-      .gte('created_at', hoursAgo.toISOString());
-
-    if (error) throw error;
-
-    const currentCount = count || 0;
-
-    return {
-      scanType,
-      currentCount,
-      isLimitReached: currentCount >= MAX_SCANS_PER_TYPE,
-    };
-  }
-
-  /**
-   * @deprecated Use checkScanEligibility for each scan type instead
-   */
-  static async getScanLimits(): Promise<Record<ScanType, ScanLimitStatus>> {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const hoursAgo = new Date();
-    hoursAgo.setHours(hoursAgo.getHours() - RATE_LIMIT_HOURS);
-
-    const scanTypes: ScanType[] = ['body', 'health', 'nutrition'];
-    const results: Record<ScanType, ScanLimitStatus> = {} as any;
-
-    for (const scanType of scanTypes) {
-      const { count, error } = await supabase
-        .from('scans')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('scan_type', scanType)
-        .gte('created_at', hoursAgo.toISOString());
-
-      if (error) throw error;
-
-      const currentCount = count || 0;
-      results[scanType] = {
-        scanType,
-        currentCount,
-        isLimitReached: currentCount >= MAX_SCANS_PER_TYPE,
-      };
-    }
-
-    return results;
-  }
-
   static async checkScanEligibility(scanType: ScanType): Promise<ScanEligibilityResponse> {
     const { data: { session } } = await supabase.auth.getSession();
 
@@ -232,7 +164,11 @@ export class ApiService {
 
     const eligibility = await this.checkScanEligibility(scanType);
     if (!eligibility.allowed) {
-      throw new Error(eligibility.message || 'Scan non autorisé');
+      throw new Error(eligibility.message || 'Scan non autorise');
+    }
+
+    if (!eligibility.scan_id) {
+      throw new Error('Scan record not created by server');
     }
 
     const response = await fetch(imageUri);
@@ -242,7 +178,7 @@ export class ApiService {
     const fileExt = imageUri.split('.').pop() || 'jpg';
     const fileName = `${user.id}/${timestamp}.${fileExt}`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKET_NAME)
       .upload(fileName, blob, {
         contentType: blob.type || 'image/jpeg',
@@ -257,11 +193,9 @@ export class ApiService {
 
     const { data, error } = await supabase
       .from('scans')
-      .insert({
-        user_id: user.id,
-        scan_type: scanType,
-        image_url: publicUrlData.publicUrl,
-      })
+      .update({ image_url: publicUrlData.publicUrl })
+      .eq('id', eligibility.scan_id)
+      .eq('user_id', user.id)
       .select()
       .single();
 

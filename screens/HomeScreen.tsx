@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Heart, UtensilsCrossed, Dumbbell } from 'lucide-react-native';
+import { UtensilsCrossed, Dumbbell } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { ApiService } from '@/services/api';
-import { DashboardData, ScanLimitStatus, ScanType } from '@/types';
+import { DashboardData, ScanEligibilityResponse, ScanType } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { CircularProgress } from '@/components/CircularProgress';
@@ -21,23 +21,41 @@ import { COLORS, SIZES, SPACING, BORDER_RADIUS, FONT_WEIGHTS } from '@/constants
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, userProfile } = useAuth();
+  const { userProfile } = useAuth();
   const { checkForAchievements } = useNotificationContext();
   const [data, setData] = useState<DashboardData | null>(null);
-  const [scanLimits, setScanLimits] = useState<Record<ScanType, ScanLimitStatus> | null>(null);
+  const [scanEligibility, setScanEligibility] = useState<Record<ScanType, ScanEligibilityResponse> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const fetchScanEligibility = async (): Promise<Record<ScanType, ScanEligibilityResponse>> => {
+    const scanTypes: ScanType[] = ['body', 'health', 'nutrition'];
+    const results: Record<ScanType, ScanEligibilityResponse> = {} as Record<ScanType, ScanEligibilityResponse>;
+
+    for (const scanType of scanTypes) {
+      try {
+        results[scanType] = await ApiService.checkScanEligibility(scanType);
+      } catch {
+        results[scanType] = {
+          success: false,
+          allowed: false,
+          message: 'Erreur de chargement',
+        };
+      }
+    }
+    return results;
+  };
+
   const fetchData = async () => {
     try {
       setError(null);
-      const [dashboardData, limits] = await Promise.all([
+      const [dashboardData, eligibility] = await Promise.all([
         ApiService.getDashboard(),
-        ApiService.getScanLimits(),
+        fetchScanEligibility(),
       ]);
       setData(dashboardData);
-      setScanLimits(limits);
+      setScanEligibility(eligibility);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     } finally {
@@ -118,16 +136,16 @@ export default function HomeScreen() {
         />
       </View>
 
-      {scanLimits && (
+      {scanEligibility && (
         <View style={styles.scanLimitsSection}>
           <Text style={styles.sectionTitle}>vos scans disponibles</Text>
           <View style={styles.scanLimitsGrid}>
-            {(Object.keys(scanLimits) as ScanType[]).map((scanType) => (
+            {(Object.keys(scanEligibility) as ScanType[]).map((scanType) => (
               <View key={scanType} style={styles.scanLimitCard}>
                 <Text style={styles.scanLimitLabel}>
                   {SCAN_TYPE_LABELS[scanType]}
                 </Text>
-                <ScanLimitIndicator limitStatus={scanLimits[scanType]} />
+                <ScanLimitIndicator eligibility={scanEligibility[scanType]} />
               </View>
             ))}
           </View>

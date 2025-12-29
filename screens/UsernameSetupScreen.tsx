@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Heart, Check, X, AlertCircle } from 'lucide-react-native';
@@ -16,7 +16,7 @@ export default function UsernameSetupScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
-  const [checkTimeout, setCheckTimeout] = useState<NodeJS.Timeout | null>(null);
+  const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isNewSignup = !userProfile;
 
@@ -32,8 +32,8 @@ export default function UsernameSetupScreen() {
   }, [user]);
 
   useEffect(() => {
-    if (checkTimeout) {
-      clearTimeout(checkTimeout);
+    if (checkTimeoutRef.current) {
+      clearTimeout(checkTimeoutRef.current);
     }
 
     if (!username) {
@@ -53,22 +53,21 @@ export default function UsernameSetupScreen() {
 
     setUsernameStatus('checking');
 
-    const timeout = setTimeout(async () => {
+    checkTimeoutRef.current = setTimeout(async () => {
       try {
         const isAvailable = await checkUsernameAvailability(username);
         setUsernameStatus(isAvailable ? 'available' : 'taken');
-      } catch (error) {
-        console.error('Error checking username:', error);
+      } catch {
         setUsernameStatus('idle');
       }
     }, 300);
 
-    setCheckTimeout(timeout);
-
     return () => {
-      if (timeout) clearTimeout(timeout);
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
     };
-  }, [username]);
+  }, [username, checkUsernameAvailability]);
 
   const validateUsername = (text: string) => {
     const cleaned = text.toLowerCase().replace(/[^a-z0-9_-]/g, '');

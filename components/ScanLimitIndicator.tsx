@@ -1,25 +1,26 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { ScanLimitStatus } from '@/types';
-import { MAX_SCANS_PER_TYPE } from '@/constants/scan';
+import { ScanEligibilityResponse } from '@/types';
 import { COLORS, SIZES, SPACING, FONT_WEIGHTS } from '@/constants/theme';
 
 interface ScanLimitIndicatorProps {
-  limitStatus: ScanLimitStatus;
+  eligibility: ScanEligibilityResponse;
 }
 
-export function ScanLimitIndicator({ limitStatus }: ScanLimitIndicatorProps) {
-  const remaining = MAX_SCANS_PER_TYPE - limitStatus.currentCount;
-  const isLimitReached = limitStatus.isLimitReached;
+export function ScanLimitIndicator({ eligibility }: ScanLimitIndicatorProps) {
+  const currentCount = eligibility.current_count || 0;
+  const limit = eligibility.limit || 1;
+  const remaining = limit - currentCount;
+  const isLimitReached = !eligibility.allowed;
 
   return (
     <View style={styles.container}>
       <View style={styles.dotsContainer}>
-        {[...Array(MAX_SCANS_PER_TYPE)].map((_, index) => (
+        {[...Array(limit)].map((_, index) => (
           <View
             key={index}
             style={[
               styles.dot,
-              index < limitStatus.currentCount && styles.dotUsed,
+              index < currentCount && styles.dotUsed,
             ]}
           />
         ))}
