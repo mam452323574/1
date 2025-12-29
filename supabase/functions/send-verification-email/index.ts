@@ -61,8 +61,10 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Trop de tentatives. Attendez 1h.' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Invalider les anciens codes
-    await supabase.rpc('invalidate_previous_codes', { p_user_id: userId, p_type: type });
+    const { error: invalidateError } = await supabase.rpc('invalidate_previous_codes', { p_user_id: userId, p_type: type });
+    if (invalidateError) {
+      console.error('Error invalidating previous codes:', invalidateError);
+    }
 
     // Créer nouveau code
     const code = Math.floor(100000 + Math.random() * 900000).toString();

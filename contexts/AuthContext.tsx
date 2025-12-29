@@ -63,7 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          await loadUserProfile(session.user.id);
+          try {
+            await loadUserProfile(session.user.id);
+          } catch (profileError) {
+            console.error('[Auth] Error loading profile on state change:', profileError);
+          }
         } else {
           setUserProfile(null);
         }
@@ -149,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username,
           avatar_url: avatarUrl || null,
           account_tier: 'free',
-          email_verified: true,
+          email_verified: false,
         });
 
       if (profileError) {
@@ -571,12 +575,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('[Cleanup] Cleaning up orphan user:', userId);
 
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const accessToken = currentSession?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/cleanup-orphan-user`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ userId }),

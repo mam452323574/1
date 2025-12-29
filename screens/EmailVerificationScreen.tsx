@@ -98,7 +98,7 @@ export default function EmailVerificationScreen() {
     setError(null);
 
     try {
-      const isValid = await verifyEmailCode(fullCode, userId);
+      const isValid = await verifyEmailCode(fullCode, userId, type);
 
       if (isValid) {
         setSuccess(true);
@@ -139,7 +139,7 @@ export default function EmailVerificationScreen() {
     setError(null);
 
     try {
-      await sendVerificationEmail(email, userId);
+      await sendVerificationEmail(email, userId, type);
       setCooldown(RESEND_COOLDOWN);
       setExpiresIn(15 * 60);
       setCode(Array(CODE_LENGTH).fill(''));

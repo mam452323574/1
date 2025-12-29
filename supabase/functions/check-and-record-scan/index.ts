@@ -105,7 +105,10 @@ Deno.serve(async (req: Request) => {
       .filter((ts: string) => new Date(ts).getTime() > cutoffTime);
 
     if (validTimestamps.length >= limit.count) {
-      const oldestTimestamp = validTimestamps.sort()[0];
+      const sortedTimestamps = validTimestamps.sort((a: string, b: string) =>
+        new Date(a).getTime() - new Date(b).getTime()
+      );
+      const oldestTimestamp = sortedTimestamps[0];
       const nextAvailableDate = new Date(oldestTimestamp).getTime() + limit.periodMs;
 
       return new Response(
@@ -146,6 +149,20 @@ Deno.serve(async (req: Request) => {
       throw updateError;
     }
 
+    const { data: scanRecord, error: scanError } = await supabaseClient
+      .from('scans')
+      .insert({
+        user_id: user.id,
+        scan_type: scanType,
+        created_at: nowIso,
+      })
+      .select('id')
+      .single();
+
+    if (scanError) {
+      console.error('Error creating scan record:', scanError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -153,6 +170,7 @@ Deno.serve(async (req: Request) => {
         message: 'Scan autorisé',
         current_count: validTimestamps.length,
         limit: limit.count,
+        scan_id: scanRecord?.id || null,
       }),
       {
         headers: {

@@ -29,11 +29,16 @@ export default function LoginScreen() {
       const { needsVerification, userId } = await signIn(email, password);
 
       if (needsVerification) {
-        await sendVerificationEmail(email, userId, 'login');
-        router.push({
-          pathname: '/email-verification',
-          params: { email, userId, type: 'login' },
-        });
+        try {
+          await sendVerificationEmail(email, userId, 'login');
+          router.push({
+            pathname: '/email-verification',
+            params: { email, userId, type: 'login' },
+          });
+        } catch (verificationError) {
+          console.error('[Login] Failed to send verification email:', verificationError);
+          setError('Erreur lors de l\'envoi du code de verification');
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur de connexion';

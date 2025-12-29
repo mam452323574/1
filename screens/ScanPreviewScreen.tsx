@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { X } from 'lucide-react-native';
@@ -18,6 +18,15 @@ export default function ScanPreviewScreen() {
   const [loading, setLoading] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const { setBadge } = useBadges();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleConfirm = async () => {
     try {
@@ -26,8 +35,8 @@ export default function ScanPreviewScreen() {
       setShowConfetti(true);
       setBadge('analytics');
 
-      setTimeout(() => {
-        Alert.alert('Succès', 'Votre scan a bien été enregistré', [
+      timeoutRef.current = setTimeout(() => {
+        Alert.alert('Succes', 'Votre scan a bien ete enregistre', [
           {
             text: 'OK',
             onPress: () => router.push('/(tabs)'),

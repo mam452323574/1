@@ -13,13 +13,21 @@ export function SuccessConfetti({ active, onAnimationEnd }: SuccessConfettiProps
   const confettiRef = useRef<any>(null);
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+
     if (active && confettiRef.current) {
       confettiRef.current.start();
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         onAnimationEnd?.();
       }, 3000);
     }
-  }, [active]);
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [active, onAnimationEnd]);
 
   if (!active) return null;
 
