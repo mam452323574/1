@@ -62,8 +62,7 @@ export function useNotifications() {
     }
   };
 
-  const handleNotificationResponse = (data: any) => {
-    console.log('Notification tapped with data:', data);
+  const handleNotificationResponse = (_data: any) => {
   };
 
   const scheduleLocalNotification = async (title: string, body: string, data?: any) => {
@@ -102,13 +101,10 @@ async function registerForPushNotificationsAsync() {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
       return null;
     }
 
     token = (await Notifications.getExpoPushTokenAsync()).data;
-  } else {
-    console.log('Must use physical device for Push Notifications');
   }
 
   if (Platform.OS === 'android') {

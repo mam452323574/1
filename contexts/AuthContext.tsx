@@ -39,17 +39,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[AuthProvider] Initializing authentication...');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('[AuthProvider] Session loaded:', session ? 'with user' : 'no session');
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        console.log('[AuthProvider] Loading user profile for:', session.user.id);
         await loadUserProfile(session.user.id);
       }
       setLoading(false);
-      console.log('[AuthProvider] Initialization complete');
     }).catch((error) => {
       console.error('[AuthProvider] Error loading session:', error);
       setLoading(false);
@@ -57,8 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session) => {
       (async () => {
-        console.log('[Auth] Auth state changed:', event, session ? 'with session' : 'no session');
-
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -88,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       setUserProfile(data);
     } catch (error) {
-      console.error('Error loading user profile:', error);
+      console.error('[Auth] Error loading user profile:', error);
     }
   };
 
@@ -114,8 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string): Promise<{ userId: string; email: string }> => {
-    console.log('[SignUp] Starting signup process for email:', email);
-
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -127,13 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Erreur lors de la creation du compte');
     }
 
-    console.log('[SignUp] Auth user created, awaiting email verification');
     return { userId: data.user.id, email: data.user.email! };
   };
 
   const completeSignUp = async (userId: string, username: string, avatarUrl?: string) => {
-    console.log('[SignUp] Completing signup for user:', userId);
-
     const isAvailable = await checkUsernameAvailability(username);
     if (!isAvailable) {
       throw new Error('Ce nom d\'utilisateur est deja pris. Veuillez en choisir un autre.');
@@ -182,7 +171,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       await loadUserProfile(userId);
-      console.log('[SignUp] Signup completed successfully');
     } catch (profileError) {
       console.error('[SignUp] Profile creation failed:', profileError);
       throw profileError;
@@ -191,13 +179,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithOAuth = async (provider: 'google' | 'apple') => {
     try {
-      console.log('[OAuth] Starting OAuth flow for provider:', provider);
-
       const redirectUrl = Platform.OS === 'web'
         ? window.location.origin
         : Linking.createURL('oauth/callback');
-
-      console.log('[OAuth] Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -213,16 +197,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (Platform.OS !== 'web' && data?.url) {
-        console.log('[OAuth] Opening browser for authentication...');
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUrl
         );
 
-        console.log('[OAuth] Browser result:', result.type);
-
         if (result.type === 'success' && result.url) {
-          console.log('[OAuth] Success! Processing callback URL...');
           const parsed = Linking.parse(result.url);
           const params = parsed.queryParams;
 
@@ -237,14 +217,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               throw sessionError;
             }
 
-            console.log('[OAuth] Session established successfully');
-
             if (sessionData.user) {
               await handleOAuthUserSetup(sessionData.user, provider);
             }
           }
         } else if (result.type === 'cancel') {
-          console.log('[OAuth] User cancelled authentication');
           throw new Error('Authentication cancelled');
         }
       }
@@ -256,8 +233,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleOAuthUserSetup = async (user: User, provider: 'google' | 'apple') => {
     try {
-      console.log('[OAuth] Setting up OAuth user:', user.id);
-
       const { data: existingProfile } = await supabase
         .from('user_profiles')
         .select('*')
@@ -265,17 +240,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (existingProfile) {
-        console.log('[OAuth] Existing user profile found');
         return;
       }
-
-      console.log('[OAuth] Creating new user profile for OAuth user');
 
       const email = user.email || `${user.id}@oauth.temp`;
       const isDisposable = await checkDisposableEmail(email);
 
       if (isDisposable) {
-        console.error('[OAuth] Disposable email detected');
         throw new Error('Disposable email addresses are not allowed');
       }
 
@@ -317,8 +288,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         muscle: 40,
         date: today,
       });
-
-      console.log('[OAuth] User setup completed successfully');
     } catch (error) {
       console.error('[OAuth] Error in user setup:', error);
       throw error;
@@ -366,7 +335,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (retryCount < maxRetries && error instanceof Error &&
           (error.message.includes('network') || error.message.includes('timeout') || error.message.includes('Query timeout'))) {
-        console.log(`[Username Check] Error, retrying... (${retryCount + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         return checkUsernameAvailability(username, retryCount + 1);
       }
@@ -376,9 +344,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
     if (!user) throw new Error('User not authenticated');
-
-    console.log('[ProfileUpdate] Starting profile update for user:', user.id);
-    console.log('[ProfileUpdate] Updates:', JSON.stringify(updates));
 
     try {
       const { data: existingProfile, error: checkError } = await supabase
@@ -393,7 +358,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (existingProfile) {
-        console.log('[ProfileUpdate] Profile exists, performing UPDATE');
         const { error: updateError } = await supabase
           .from('user_profiles')
           .update(updates)
@@ -403,9 +367,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.error('[ProfileUpdate] UPDATE failed:', updateError);
           throw updateError;
         }
-        console.log('[ProfileUpdate] UPDATE successful');
       } else {
-        console.log('[ProfileUpdate] Profile does not exist, performing INSERT');
         const profileData = {
           id: user.id,
           email: user.email || `${user.id}@oauth.temp`,
@@ -421,11 +383,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.error('[ProfileUpdate] INSERT failed:', insertError);
           throw insertError;
         }
-        console.log('[ProfileUpdate] INSERT successful');
       }
 
       await loadUserProfile(user.id);
-      console.log('[ProfileUpdate] Profile reloaded successfully');
     } catch (error) {
       console.error('[ProfileUpdate] Critical error in updateUserProfile:', error);
       throw error;
@@ -453,8 +413,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const sendVerificationEmail = async (email: string, userId: string, type: 'signup' | 'login' = 'signup'): Promise<void> => {
     try {
-      console.log('[Verification] Sending verification email to:', email);
-
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-verification-email`,
         {
@@ -472,8 +430,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         throw new Error(data.error || 'Echec de l\'envoi du code de verification');
       }
-
-      console.log('[Verification] Email sent successfully');
     } catch (error) {
       console.error('[Verification] Error sending email:', error);
       throw error;
@@ -482,8 +438,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyEmailCode = async (code: string, userId: string, type: 'signup' | 'login' = 'signup'): Promise<boolean> => {
     try {
-      console.log('[Verification] Verifying code for user:', userId);
-
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-email-code`,
         {
@@ -503,7 +457,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || 'Code incorrect');
       }
 
-      console.log('[Verification] Code verified successfully');
       return data.verified === true;
     } catch (error) {
       console.error('[Verification] Error verifying code:', error);
@@ -513,8 +466,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkTrustedDevice = async (deviceFingerprint: string, userId: string): Promise<boolean> => {
     try {
-      console.log('[TrustedDevice] Checking device:', deviceFingerprint);
-
       const { data, error } = await supabase
         .from('trusted_devices')
         .select('*')
@@ -528,7 +479,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const isTrusted = !!data;
-      console.log('[TrustedDevice] Device trusted:', isTrusted);
 
       if (isTrusted) {
         await supabase
@@ -546,8 +496,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const addTrustedDevice = async (deviceFingerprint: string, deviceName: string, userId: string): Promise<void> => {
     try {
-      console.log('[TrustedDevice] Adding device:', deviceName);
-
       const { error } = await supabase
         .from('trusted_devices')
         .upsert({
@@ -563,8 +511,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('[TrustedDevice] Error adding device:', error);
         throw error;
       }
-
-      console.log('[TrustedDevice] Device added successfully');
     } catch (error) {
       console.error('[TrustedDevice] Error adding device:', error);
       throw error;
@@ -573,8 +519,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const cleanupOrphanUser = async (userId: string): Promise<void> => {
     try {
-      console.log('[Cleanup] Cleaning up orphan user:', userId);
-
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       const accessToken = currentSession?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -596,7 +540,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       await supabase.auth.signOut();
-      console.log('[Cleanup] Orphan user cleaned up');
     } catch (error) {
       console.error('[Cleanup] Error:', error);
     }
@@ -604,14 +547,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      console.log('[SignOut] Starting complete cleanup...');
-
-      console.log('[SignOut] Step 1: Clearing local state');
       setUserProfile(null);
       setUser(null);
       setSession(null);
 
-      console.log('[SignOut] Step 2: Clearing AsyncStorage');
       try {
         await AsyncStorage.multiRemove([
           'supabase.auth.token',
@@ -621,14 +560,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('[SignOut] AsyncStorage cleanup error:', storageError);
       }
 
-      console.log('[SignOut] Step 3: Signing out from Supabase');
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) {
         console.error('[SignOut] Supabase sign out error:', error);
         throw error;
       }
-
-      console.log('[SignOut] Complete cleanup finished successfully');
     } catch (error) {
       console.error('[SignOut] Error during sign out:', error);
       setUserProfile(null);

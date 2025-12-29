@@ -68,12 +68,16 @@ export function BadgeProvider({ children }: { children: ReactNode }) {
       const stored = await AsyncStorage.getItem(BADGE_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        setBadges(parsed.badges || badges);
+        setBadges(prev => ({
+          analytics: parsed.badges?.analytics ?? prev.analytics,
+          recipes: parsed.badges?.recipes ?? prev.recipes,
+          exercises: parsed.badges?.exercises ?? prev.exercises,
+        }));
         setLastCheckedRecipes(parsed.lastCheckedRecipes || null);
         setLastCheckedExercises(parsed.lastCheckedExercises || null);
       }
     } catch (error) {
-      console.error('Error loading badge state:', error);
+      console.error('[BadgeContext] Error loading badge state:', error);
     }
   };
 

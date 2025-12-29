@@ -27,14 +27,30 @@ export default function EmailVerificationScreen() {
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const cooldownRef = useRef<NodeJS.Timeout | null>(null);
   const expiryRef = useRef<NodeJS.Timeout | null>(null);
+  const redirectRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
 
   const email = params.email || user?.email || '';
   const userId = params.userId || user?.id || '';
   const type = (params.type as 'signup' | 'login') || 'signup';
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (cooldownRef.current) clearTimeout(cooldownRef.current);
+      if (expiryRef.current) clearTimeout(expiryRef.current);
+      if (redirectRef.current) clearTimeout(redirectRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (cooldown > 0) {
-      cooldownRef.current = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      cooldownRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setCooldown(cooldown - 1);
+        }
+      }, 1000);
     }
     return () => {
       if (cooldownRef.current) clearTimeout(cooldownRef.current);
@@ -43,7 +59,11 @@ export default function EmailVerificationScreen() {
 
   useEffect(() => {
     if (expiresIn > 0 && !success) {
-      expiryRef.current = setTimeout(() => setExpiresIn(expiresIn - 1), 1000);
+      expiryRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setExpiresIn(expiresIn - 1);
+        }
+      }, 1000);
     }
     return () => {
       if (expiryRef.current) clearTimeout(expiryRef.current);
@@ -113,7 +133,8 @@ export default function EmailVerificationScreen() {
           }
         }
 
-        setTimeout(() => {
+        redirectRef.current = setTimeout(() => {
+          if (!isMountedRef.current) return;
           if (type === 'signup') {
             router.replace('/username-setup');
           } else if (params.returnTo) {

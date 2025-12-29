@@ -18,12 +18,10 @@ export default function SettingsScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
-    console.log('[Settings] Screen mounted, resetting isSigningOut state');
     setIsSigningOut(false);
 
     const timeout = setTimeout(() => {
       if (isSigningOut) {
-        console.warn('[Settings] isSigningOut was stuck, force resetting to false');
         setIsSigningOut(false);
       }
     }, 10000);
@@ -34,7 +32,6 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (isSigningOut) {
       const resetTimeout = setTimeout(() => {
-        console.warn('[Settings] Sign out took too long, resetting state');
         setIsSigningOut(false);
       }, 15000);
       return () => clearTimeout(resetTimeout);
@@ -56,10 +53,7 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = async () => {
-    console.log('[Settings] handleSignOut called, isSigningOut:', isSigningOut);
-
     if (isSigningOut) {
-      console.log('[Settings] Already signing out, ignoring click');
       return;
     }
 
@@ -68,34 +62,26 @@ export default function SettingsScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
 
-      console.log('[Settings] Showing sign out confirmation dialog');
       Alert.alert(
-        '⚠️ Déconnexion',
-        'Êtes-vous sûr de vouloir vous déconnecter ?\n\nVos données seront sauvegardées et vous pourrez vous reconnecter à tout moment.',
+        'Deconnexion',
+        'Etes-vous sur de vouloir vous deconnecter ?\n\nVos donnees seront sauvegardees et vous pourrez vous reconnecter a tout moment.',
         [
           {
             text: 'Annuler',
             style: 'cancel',
-            onPress: () => {
-              console.log('[Settings] Sign out cancelled by user');
-            },
           },
           {
-            text: 'Se Déconnecter',
+            text: 'Se Deconnecter',
             style: 'destructive',
             onPress: async () => {
               try {
-                console.log('[Settings] User confirmed sign out');
                 setIsSigningOut(true);
 
                 if (Platform.OS !== 'web') {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                 }
 
-                console.log('[Settings] Calling signOut and navigating to login');
                 await signOut();
-
-                console.log('[Settings] Redirecting to login page');
                 router.replace('/login');
 
               } catch (error) {
@@ -103,7 +89,7 @@ export default function SettingsScreen() {
                 setIsSigningOut(false);
                 Alert.alert(
                   'Erreur',
-                  'Une erreur est survenue lors de la déconnexion. Veuillez réessayer.',
+                  'Une erreur est survenue lors de la deconnexion. Veuillez reessayer.',
                   [
                     {
                       text: 'OK',
@@ -245,8 +231,6 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={[styles.signOutButton, isSigningOut && styles.signOutButtonDisabled]}
           onPress={handleSignOut}
-          onPressIn={() => console.log('[Settings] Button pressed in')}
-          onPressOut={() => console.log('[Settings] Button pressed out')}
           activeOpacity={0.7}
           disabled={isSigningOut}
         >

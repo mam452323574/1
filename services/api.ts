@@ -210,8 +210,6 @@ export class ApiService {
       throw new Error('User not authenticated');
     }
 
-    console.log('[API] Starting N8n analysis for scan:', scanId);
-
     try {
       const analysisResult = await N8nWebhookService.analyzeScan(
         imageUrl,
@@ -235,7 +233,6 @@ export class ApiService {
 
       if (updateError) throw updateError;
 
-      console.log('[API] N8n analysis completed and saved');
       return updateData;
     } catch (error) {
       console.error('[API] Error analyzing scan with N8n:', error);

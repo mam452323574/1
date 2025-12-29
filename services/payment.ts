@@ -34,16 +34,12 @@ class PaymentService {
 
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.log('[PaymentService] Already initialized');
       return;
     }
 
     try {
-      console.log('[PaymentService] Initializing connection...');
       await initConnection();
       this.isInitialized = true;
-      console.log('[PaymentService] Connection initialized successfully');
-
       this.setupPurchaseListeners();
     } catch (error) {
       console.error('[PaymentService] Initialization error:', error);
@@ -52,15 +48,8 @@ class PaymentService {
   }
 
   private setupPurchaseListeners(): void {
-    console.log('[PaymentService] Setting up purchase listeners');
-
     this.purchaseUpdateSubscription = purchaseUpdatedListener(
       async (purchase: Purchase | SubscriptionPurchase) => {
-        console.log('[PaymentService] Purchase updated:', {
-          productId: purchase.productId,
-          transactionId: purchase.transactionId,
-        });
-
         const receipt = purchase.transactionReceipt;
         if (receipt) {
           try {
@@ -74,24 +63,18 @@ class PaymentService {
 
     this.purchaseErrorSubscription = purchaseErrorListener(
       (error: PurchaseError) => {
-        console.log('[PaymentService] Purchase error:', {
-          code: error.code,
-          message: error.message,
-        });
+        console.error('[PaymentService] Purchase error:', error.code, error.message);
       }
     );
   }
 
   async getProductDetails(): Promise<Product | null> {
     try {
-      console.log('[PaymentService] Fetching product details...');
-
       const productIds = Platform.OS === 'android'
         ? PRODUCT_IDS.android
         : PRODUCT_IDS.ios;
 
       const products = await getProducts({ skus: productIds });
-      console.log('[PaymentService] Products fetched:', products.length);
 
       if (products.length > 0) {
         return products[0];
@@ -106,8 +89,6 @@ class PaymentService {
 
   async purchaseProduct(): Promise<PurchaseResult> {
     try {
-      console.log('[PaymentService] Initiating purchase...');
-
       if (!this.isInitialized) {
         await this.initialize();
       }
@@ -115,8 +96,6 @@ class PaymentService {
       const productId = Platform.OS === 'android'
         ? PRODUCT_IDS.android[0]
         : PRODUCT_IDS.ios[0];
-
-      console.log('[PaymentService] Requesting purchase for:', productId);
 
       await requestPurchase({ sku: productId });
 
@@ -147,8 +126,6 @@ class PaymentService {
     purchase: Purchase | SubscriptionPurchase
   ): Promise<void> {
     try {
-      console.log('[PaymentService] Verifying purchase with backend...');
-
       const purchaseToken = Platform.OS === 'android'
         ? purchase.purchaseToken
         : purchase.transactionReceipt;
@@ -174,8 +151,6 @@ class PaymentService {
         platform: Platform.OS,
       });
 
-      console.log('[PaymentService] Calling upgrade-to-premium function...');
-
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers,
@@ -185,10 +160,7 @@ class PaymentService {
       const result = await response.json();
 
       if (result.success) {
-        console.log('[PaymentService] Purchase verified successfully');
-
         await finishTransaction({ purchase, isConsumable: false });
-        console.log('[PaymentService] Transaction finished');
       } else {
         console.error('[PaymentService] Verification failed:', result.error);
         throw new Error(result.error || 'Verification failed');
@@ -201,14 +173,11 @@ class PaymentService {
 
   async restorePurchases(): Promise<PurchaseResult> {
     try {
-      console.log('[PaymentService] Restoring purchases...');
-
       if (!this.isInitialized) {
         await this.initialize();
       }
 
       const availablePurchases = await getAvailablePurchases();
-      console.log('[PaymentService] Available purchases:', availablePurchases.length);
 
       if (availablePurchases.length === 0) {
         return {
@@ -248,8 +217,6 @@ class PaymentService {
   }
 
   async cleanup(): Promise<void> {
-    console.log('[PaymentService] Cleaning up...');
-
     if (this.purchaseUpdateSubscription) {
       this.purchaseUpdateSubscription.remove();
       this.purchaseUpdateSubscription = null;
@@ -264,8 +231,6 @@ class PaymentService {
       await endConnection();
       this.isInitialized = false;
     }
-
-    console.log('[PaymentService] Cleanup complete');
   }
 }
 

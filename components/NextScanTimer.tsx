@@ -10,6 +10,7 @@ interface NextScanTimerProps {
 
 export function NextScanTimer({ nextAvailableDate, scanLabel }: NextScanTimerProps) {
   const [timeRemaining, setTimeRemaining] = useState('');
+  const [isAvailable, setIsAvailable] = useState(false);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -17,10 +18,12 @@ export function NextScanTimer({ nextAvailableDate, scanLabel }: NextScanTimerPro
       const diff = nextAvailableDate - now;
 
       if (diff <= 0) {
-        setTimeRemaining('Disponible maintenant');
+        setTimeRemaining('');
+        setIsAvailable(true);
         return;
       }
 
+      setIsAvailable(false);
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -39,6 +42,17 @@ export function NextScanTimer({ nextAvailableDate, scanLabel }: NextScanTimerPro
 
     return () => clearInterval(interval);
   }, [nextAvailableDate]);
+
+  if (isAvailable) {
+    return (
+      <View style={styles.container}>
+        <Clock color={COLORS.success} size={14} strokeWidth={2} />
+        <Text style={[styles.text, styles.availableText]}>
+          {scanLabel} disponible
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -62,5 +76,8 @@ const styles = StyleSheet.create({
     fontSize: SIZES.text12,
     color: COLORS.gray,
     fontWeight: FONT_WEIGHTS.regular,
+  },
+  availableText: {
+    color: COLORS.success,
   },
 });

@@ -27,9 +27,7 @@ let currentWebhookIndex = 0;
 export class N8nWebhookService {
   private static getNextWebhookUrl(): string {
     const url = N8N_WEBHOOKS[currentWebhookIndex];
-    const webhookNumber = currentWebhookIndex + 1;
     currentWebhookIndex = (currentWebhookIndex + 1) % N8N_WEBHOOKS.length;
-    console.log(`[N8n] Using webhook ${webhookNumber}/${N8N_WEBHOOKS.length}`);
     return url;
   }
 
@@ -39,11 +37,6 @@ export class N8nWebhookService {
     scanType: ScanType
   ): Promise<N8nAnalysisResponse> {
     try {
-      console.log('[N8n] Starting analysis via webhook');
-      console.log('[N8n] Image URL:', imageUrl);
-      console.log('[N8n] User ID:', userId);
-      console.log('[N8n] Scan Type:', scanType);
-
       const webhookUrl = this.getNextWebhookUrl();
 
       const requestBody: N8nAnalysisRequest = {
@@ -51,8 +44,6 @@ export class N8nWebhookService {
         userId,
         scanType,
       };
-
-      console.log('[N8n] Sending request to:', webhookUrl);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -74,8 +65,6 @@ export class N8nWebhookService {
       }
 
       const data: N8nAnalysisResponse = await response.json();
-      console.log('[N8n] Analysis completed successfully');
-
       return data;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
@@ -95,16 +84,11 @@ export class N8nWebhookService {
 
   static async testWebhookConnection(): Promise<boolean> {
     try {
-      console.log('[N8n] Testing webhook connection');
-
       const response = await fetch(N8N_WEBHOOKS[0], {
         method: 'GET',
       });
 
-      const isConnected = response.ok;
-      console.log('[N8n] Connection test result:', isConnected ? 'Success' : 'Failed');
-
-      return isConnected;
+      return response.ok;
     } catch (error) {
       console.error('[N8n] Connection test error:', error);
       return false;

@@ -31,11 +31,9 @@ function RootLayoutNav() {
     const timeSinceLastRedirect = now - lastRedirectTime.current;
 
     if (timeSinceLastRedirect < 1000 && !inAuthGroup && !inLogin) {
-      console.warn('[Navigation] Rapid redirect detected, incrementing counter');
       setRedirectCount(prev => prev + 1);
     } else {
       if ((inAuthGroup || inLogin) && redirectCount > 0) {
-        console.log('[Navigation] User reached stable state, resetting counter');
         setRedirectCount(0);
         setLoopDetected(false);
       }
@@ -72,17 +70,12 @@ function RootLayoutNav() {
     }
 
     if (!user && !inLogin && !inEmailVerification) {
-      console.log('[Navigation] No user detected, redirecting to login');
       lastRedirectTime.current = now;
       router.replace('/login');
     } else if (user && !userProfile?.username && !inUsernameSetup && !inEmailVerification) {
-      console.log('[Navigation] User missing username, redirecting to setup');
-      console.log('[Navigation] User ID:', user.id);
-      console.log('[Navigation] User Profile:', userProfile);
       lastRedirectTime.current = now;
       router.replace('/username-setup');
     } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin && !inEmailVerification) {
-      console.log('[Navigation] User authenticated, redirecting to tabs');
       lastRedirectTime.current = now;
       router.replace('/(tabs)');
     }

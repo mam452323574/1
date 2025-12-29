@@ -76,7 +76,8 @@ export default function UsernameSetupScreen() {
 
   const handleComplete = async () => {
     if (!user) {
-      console.error('[UsernameSetup] No user found');
+      setError('Session invalide. Veuillez vous reconnecter.');
+      router.replace('/login');
       return;
     }
 
@@ -94,21 +95,15 @@ export default function UsernameSetupScreen() {
       setLoading(true);
       setError(null);
 
-      console.log('[UsernameSetup] Starting profile completion for user:', user.id);
-      console.log('[UsernameSetup] Is new signup:', isNewSignup);
-
       if (isNewSignup) {
         await completeSignUp(user.id, username, avatarUrl || undefined);
-        console.log('[UsernameSetup] New signup completed successfully');
       } else {
         await updateUserProfile({
           username,
           avatar_url: avatarUrl,
         });
-        console.log('[UsernameSetup] Profile updated successfully');
 
         const provider = user.app_metadata.provider || 'google';
-        console.log('[UsernameSetup] Creating OAuth connection for provider:', provider);
 
         const { error: oauthError } = await supabase.from('oauth_connections').insert({
           user_id: user.id,
@@ -138,7 +133,6 @@ export default function UsernameSetupScreen() {
         }
       }
 
-      console.log('[UsernameSetup] Setup complete, redirecting to tabs');
       router.replace('/(tabs)');
     } catch (err) {
       console.error('[UsernameSetup] Critical error during setup:', err);
