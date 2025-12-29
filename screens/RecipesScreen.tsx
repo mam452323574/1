@@ -98,7 +98,7 @@ export default function RecipesScreen() {
         <FlatList
           data={filteredRecipes}
           renderItem={renderRecipe}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
         />
       )}

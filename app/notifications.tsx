@@ -29,11 +29,7 @@ export default function NotificationsScreen() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [markingAllAsRead, setMarkingAllAsRead] = useState(false);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [filter]);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -60,12 +56,16 @@ export default function NotificationsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user, filter]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchNotifications();
-  }, [filter]);
+  }, [fetchNotifications]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     await markNotificationAsRead(notificationId);

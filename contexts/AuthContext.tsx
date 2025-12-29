@@ -119,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Erreur lors de la creation du compte');
     }
 
-    return { userId: data.user.id, email: data.user.email! };
+    return { userId: data.user.id, email: data.user.email || email };
   };
 
   const completeSignUp = async (userId: string, username: string, avatarUrl?: string) => {
@@ -134,11 +134,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      const userEmail = user.email || `${userId}@oauth.temp`;
       const { error: profileError } = await supabase
         .from('user_profiles')
         .insert({
           id: userId,
-          email: user.email!,
+          email: userEmail,
           username,
           avatar_url: avatarUrl || null,
           account_tier: 'free',

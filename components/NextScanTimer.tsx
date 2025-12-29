@@ -13,6 +13,8 @@ export function NextScanTimer({ nextAvailableDate, scanLabel }: NextScanTimerPro
   const [isAvailable, setIsAvailable] = useState(false);
 
   useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
     const updateTimer = () => {
       const now = Date.now();
       const diff = nextAvailableDate - now;
@@ -20,6 +22,7 @@ export function NextScanTimer({ nextAvailableDate, scanLabel }: NextScanTimerPro
       if (diff <= 0) {
         setTimeRemaining('');
         setIsAvailable(true);
+        if (intervalId) clearInterval(intervalId);
         return;
       }
 
@@ -27,20 +30,27 @@ export function NextScanTimer({ nextAvailableDate, scanLabel }: NextScanTimerPro
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       if (days > 0) {
         setTimeRemaining(`${days}j ${hours}h`);
       } else if (hours > 0) {
         setTimeRemaining(`${hours}h ${minutes}min`);
-      } else {
+      } else if (minutes > 0) {
         setTimeRemaining(`${minutes}min`);
+      } else {
+        setTimeRemaining(`${seconds}s`);
       }
     };
 
     updateTimer();
-    const interval = setInterval(updateTimer, 60000);
+    const diff = nextAvailableDate - Date.now();
+    const intervalMs = diff <= 120000 ? 1000 : 60000;
+    intervalId = setInterval(updateTimer, intervalMs);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [nextAvailableDate]);
 
   if (isAvailable) {

@@ -65,49 +65,53 @@ export default function AnalyticsScreen() {
     },
   };
 
-  const healthScoreData = {
-    labels: data.healthScoreHistory.slice(-7).map((item) => {
+  const healthScoreSlice = data.healthScoreHistory.slice(-7);
+  const calorieSlice = data.calorieHistory.slice(-7);
+  const bodyCompositionSlice = data.bodyCompositionHistory.slice(-7);
+
+  const healthScoreData = healthScoreSlice.length > 0 ? {
+    labels: healthScoreSlice.map((item) => {
       const date = new Date(item.date);
       return `${date.getDate()}/${date.getMonth() + 1}`;
     }),
     datasets: [
       {
-        data: data.healthScoreHistory.slice(-7).map((item) => item.value),
+        data: healthScoreSlice.map((item) => item.value),
       },
     ],
-  };
+  } : null;
 
-  const caloriesData = {
-    labels: data.calorieHistory.slice(-7).map((item) => {
+  const caloriesData = calorieSlice.length > 0 ? {
+    labels: calorieSlice.map((item) => {
       const date = new Date(item.date);
       return `${date.getDate()}/${date.getMonth() + 1}`;
     }),
     datasets: [
       {
-        data: data.calorieHistory.slice(-7).map((item) => item.consumed),
+        data: calorieSlice.map((item) => item.consumed),
       },
     ],
-  };
+  } : null;
 
-  const bodyCompositionData = {
-    labels: data.bodyCompositionHistory.slice(-7).map((item) => {
+  const bodyCompositionData = bodyCompositionSlice.length > 0 ? {
+    labels: bodyCompositionSlice.map((item) => {
       const date = new Date(item.date);
       return `${date.getDate()}/${date.getMonth() + 1}`;
     }),
     datasets: [
       {
-        data: data.bodyCompositionHistory.slice(-7).map((item) => item.bodyfat),
+        data: bodyCompositionSlice.map((item) => item.bodyfat),
         color: () => COLORS.primary,
         strokeWidth: 2,
       },
       {
-        data: data.bodyCompositionHistory.slice(-7).map((item) => item.muscle),
+        data: bodyCompositionSlice.map((item) => item.muscle),
         color: () => COLORS.secondary,
         strokeWidth: 2,
       },
     ],
     legend: ['Masse Grasse %', 'Muscle %'],
-  };
+  } : null;
 
   return (
     <ScrollView style={styles.container}>
@@ -142,42 +146,48 @@ export default function AnalyticsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.chartSection}>
-        <Text style={styles.chartTitle}>Score Santé</Text>
-        <LineChart
-          data={healthScoreData}
-          width={screenWidth - SPACING.lg * 2}
-          height={220}
-          chartConfig={chartConfig}
-          bezier
-          style={styles.chart}
-        />
-      </View>
+      {healthScoreData && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Score Sante</Text>
+          <LineChart
+            data={healthScoreData}
+            width={screenWidth - SPACING.lg * 2}
+            height={220}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+          />
+        </View>
+      )}
 
-      <View style={styles.chartSection}>
-        <Text style={styles.chartTitle}>Calories Consommées</Text>
-        <BarChart
-          data={caloriesData}
-          width={screenWidth - SPACING.lg * 2}
-          height={220}
-          chartConfig={chartConfig}
-          style={styles.chart}
-          yAxisLabel=""
-          yAxisSuffix=""
-        />
-      </View>
+      {caloriesData && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Calories Consommees</Text>
+          <BarChart
+            data={caloriesData}
+            width={screenWidth - SPACING.lg * 2}
+            height={220}
+            chartConfig={chartConfig}
+            style={styles.chart}
+            yAxisLabel=""
+            yAxisSuffix=""
+          />
+        </View>
+      )}
 
-      <View style={styles.chartSection}>
-        <Text style={styles.chartTitle}>Composition Corporelle</Text>
-        <LineChart
-          data={bodyCompositionData}
-          width={screenWidth - SPACING.lg * 2}
-          height={220}
-          chartConfig={chartConfig}
-          bezier
-          style={styles.chart}
-        />
-      </View>
+      {bodyCompositionData && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Composition Corporelle</Text>
+          <LineChart
+            data={bodyCompositionData}
+            width={screenWidth - SPACING.lg * 2}
+            height={220}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+          />
+        </View>
+      )}
     </ScrollView>
   );
 }

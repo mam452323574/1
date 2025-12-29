@@ -9,7 +9,7 @@ import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, signInWithOAuth, sendVerificationEmail, user } = useAuth();
+  const { signIn, signInWithOAuth, sendVerificationEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

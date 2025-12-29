@@ -32,6 +32,7 @@ export default function ScanPreviewScreen() {
     try {
       setLoading(true);
       await ApiService.createScan(imageUri, scanType);
+      setLoading(false);
       setShowConfetti(true);
       setBadge('analytics');
 

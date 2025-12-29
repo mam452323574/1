@@ -12,7 +12,7 @@ import { paymentService } from '@/services/payment';
 
 export default function PremiumUpgradeScreen() {
   const router = useRouter();
-  const { userProfile } = useAuth();
+  const { userProfile, refreshUserProfile } = useAuth();
   const [features, setFeatures] = useState<PremiumFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
@@ -156,25 +156,6 @@ export default function PremiumUpgradeScreen() {
       );
     } finally {
       setRestoring(false);
-    }
-  };
-
-  const refreshUserProfile = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (data) {
-          console.log('User profile refreshed:', data.account_tier);
-        }
-      }
-    } catch (error) {
-      console.error('Error refreshing profile:', error);
     }
   };
 

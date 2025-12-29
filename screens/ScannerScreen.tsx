@@ -28,11 +28,16 @@ export default function ScannerScreen() {
   const [loading, setLoading] = useState(true);
   const [checkingEligibility, setCheckingEligibility] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     checkAllScanEligibility();
     const interval = setInterval(checkAllScanEligibility, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      isMountedRef.current = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const checkAllScanEligibility = async () => {
@@ -50,11 +55,15 @@ export default function ScannerScreen() {
         }
       }
 
-      setScanEligibility(results);
+      if (isMountedRef.current) {
+        setScanEligibility(results);
+      }
     } catch (err) {
       console.error('Error checking scan eligibility:', err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 

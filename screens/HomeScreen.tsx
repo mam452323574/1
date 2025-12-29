@@ -66,7 +66,9 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchData();
-    checkForAchievements();
+    checkForAchievements().catch((err) => {
+      console.error('[HomeScreen] Error checking achievements:', err);
+    });
   }, []);
 
   const onRefresh = () => {

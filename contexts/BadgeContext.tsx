@@ -61,7 +61,7 @@ export function BadgeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     saveBadgeState();
-  }, [badges]);
+  }, [badges, lastCheckedRecipes, lastCheckedExercises]);
 
   const loadBadgeState = async () => {
     try {

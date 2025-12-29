@@ -98,7 +98,7 @@ export default function ExercisesScreen() {
         <FlatList
           data={filteredExercises}
           renderItem={renderExercise}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
         />
       )}
