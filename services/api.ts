@@ -145,9 +145,37 @@ export class ApiService {
     return data;
   }
 
+  static async checkScanEligibilityOnly(scanType: ScanType): Promise<ScanEligibilityResponse> {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      throw new Error('User not authenticated');
+    }
+
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/check-and-record-scan`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ scanType, checkOnly: true }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to check scan eligibility');
+    }
+
+    const data: ScanEligibilityResponse = await response.json();
+    return data;
+  }
+
   static async getNextAvailableScanDate(scanType: ScanType): Promise<number | null> {
     try {
-      const result = await this.checkScanEligibility(scanType);
+      const result = await this.checkScanEligibilityOnly(scanType);
       return result.next_available_date || null;
     } catch (error) {
       console.error('Error getting next scan date:', error);

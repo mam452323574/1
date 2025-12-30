@@ -91,6 +91,12 @@ export interface ScanUsage {
   nutrition: ScanUsageRecord;
 }
 
+export interface WelcomeCredits {
+  health: number;
+  body: number;
+  nutrition: number;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -106,6 +112,7 @@ export interface UserProfile {
     newContent: boolean;
   };
   scan_usage: ScanUsage;
+  welcome_credits: WelcomeCredits;
   last_scan_date: string | null;
   account_created_at: string;
   created_at: string;
@@ -154,6 +161,9 @@ export interface ScanEligibilityResponse {
   limit?: number;
   scan_id?: string;
   error?: string;
+  used_welcome_credit?: boolean;
+  remaining_welcome_credits?: number;
+  welcome_credits?: number;
 }
 
 export interface ScanLimitConfig {

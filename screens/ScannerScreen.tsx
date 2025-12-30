@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { Camera, FlipHorizontal, Image as ImageIcon, Crown } from 'lucide-react-native';
+import { Camera, FlipHorizontal, Image as ImageIcon, Crown, Gift } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -47,7 +47,7 @@ export default function ScannerScreen() {
 
       for (const scanType of scanTypes) {
         try {
-          const result = await ApiService.checkScanEligibility(scanType);
+          const result = await ApiService.checkScanEligibilityOnly(scanType);
           results[scanType] = result;
         } catch (error) {
           console.error(`Error checking ${scanType} eligibility:`, error);
@@ -69,8 +69,10 @@ export default function ScannerScreen() {
 
   const handleScanTypeSelect = async (scanType: ScanType) => {
     const eligibility = scanEligibility[scanType];
+    const welcomeCredits = eligibility?.welcome_credits || 0;
+    const hasWelcomeCredits = welcomeCredits > 0;
 
-    if (!eligibility || !eligibility.allowed) {
+    if (!eligibility || (!eligibility.allowed && !hasWelcomeCredits)) {
       if (eligibility && eligibility.next_available_date) {
         const nextDate = new Date(eligibility.next_available_date);
         const now = new Date();
@@ -90,7 +92,7 @@ export default function ScannerScreen() {
 
         Alert.alert(
           'Limite atteinte',
-          `${eligibility.message} ${timeMessage}.\n\nPassez à Premium pour 3 scans par jour !`,
+          `${eligibility.message} ${timeMessage}.\n\nPassez a Premium pour 3 scans par jour !`,
           [
             { text: 'OK', style: 'cancel' },
             {
@@ -205,7 +207,9 @@ export default function ScannerScreen() {
   const renderScanTypeButton = (scanType: ScanType) => {
     const isSelected = selectedScanType === scanType;
     const eligibility = scanEligibility[scanType];
-    const isDisabled = eligibility ? !eligibility.allowed : false;
+    const welcomeCredits = eligibility?.welcome_credits || 0;
+    const hasWelcomeCredits = welcomeCredits > 0;
+    const isDisabled = eligibility ? (!eligibility.allowed && !hasWelcomeCredits) : false;
     const isPremium = userProfile?.account_tier === 'premium';
     const limits = isPremium ? PREMIUM_SCAN_LIMITS : FREE_SCAN_LIMITS;
     const limit = limits[scanType];
@@ -217,6 +221,7 @@ export default function ScannerScreen() {
             styles.scanTypeButton,
             isSelected && styles.scanTypeButtonSelected,
             isDisabled && styles.scanTypeButtonDisabled,
+            hasWelcomeCredits && styles.scanTypeButtonWelcome,
           ]}
           onPress={() => handleScanTypeSelect(scanType)}
           disabled={isDisabled}
@@ -225,14 +230,25 @@ export default function ScannerScreen() {
           <Text style={[styles.scanTypeText, isSelected && styles.scanTypeTextSelected]}>
             {SCAN_TYPE_LABELS[scanType]}
           </Text>
-          <Text style={styles.limitLabel}>{limit.label}</Text>
-          {eligibility && (
-            <Text style={styles.countLabel}>
-              {eligibility.current_count || 0}/{eligibility.limit || limit.count}
-            </Text>
+          {hasWelcomeCredits ? (
+            <View style={styles.welcomeCreditsContainer}>
+              <Gift color={COLORS.success} size={12} strokeWidth={2} />
+              <Text style={styles.welcomeCreditsLabel}>
+                {welcomeCredits} gratuit{welcomeCredits > 1 ? 's' : ''}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.limitLabel}>{limit.label}</Text>
+              {eligibility && (
+                <Text style={styles.countLabel}>
+                  {eligibility.current_count || 0}/{eligibility.limit || limit.count}
+                </Text>
+              )}
+            </>
           )}
         </TouchableOpacity>
-        {isDisabled && eligibility?.next_available_date && (
+        {isDisabled && eligibility?.next_available_date && !hasWelcomeCredits && (
           <NextScanTimer
             nextAvailableDate={eligibility.next_available_date}
             scanLabel="Disponible"
@@ -269,18 +285,40 @@ export default function ScannerScreen() {
           {renderScanTypeButton('nutrition')}
         </View>
 
-        {userProfile?.account_tier === 'free' && (
-          <TouchableOpacity
-            style={styles.upgradePrompt}
-            onPress={() => router.push('/premium-plan')}
-            activeOpacity={0.8}
-          >
-            <Crown color={COLORS.primary} size={20} fill={COLORS.primary} />
-            <Text style={styles.upgradePromptText}>
-              Passez à Premium pour 3 scans par jour de chaque type
-            </Text>
-          </TouchableOpacity>
-        )}
+        {(() => {
+          const totalWelcomeCredits =
+            (scanEligibility.health?.welcome_credits || 0) +
+            (scanEligibility.body?.welcome_credits || 0) +
+            (scanEligibility.nutrition?.welcome_credits || 0);
+
+          if (totalWelcomeCredits > 0) {
+            return (
+              <View style={styles.welcomeOfferBanner}>
+                <Gift color={COLORS.success} size={20} strokeWidth={2} />
+                <Text style={styles.welcomeOfferText}>
+                  Offre de bienvenue : {totalWelcomeCredits} scan{totalWelcomeCredits > 1 ? 's' : ''} gratuit{totalWelcomeCredits > 1 ? 's' : ''} !
+                </Text>
+              </View>
+            );
+          }
+
+          if (userProfile?.account_tier === 'free') {
+            return (
+              <TouchableOpacity
+                style={styles.upgradePrompt}
+                onPress={() => router.push('/premium-plan')}
+                activeOpacity={0.8}
+              >
+                <Crown color={COLORS.primary} size={20} fill={COLORS.primary} />
+                <Text style={styles.upgradePromptText}>
+                  Passez a Premium pour 3 scans par jour de chaque type
+                </Text>
+              </TouchableOpacity>
+            );
+          }
+
+          return null;
+        })()}
 
         <CameraGuide scanType={selectedScanType} />
 
@@ -374,6 +412,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     opacity: 0.5,
   },
+  scanTypeButtonWelcome: {
+    borderWidth: 2,
+    borderColor: COLORS.success,
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+  },
   scanTypeText: {
     fontSize: SIZES.text14,
     fontWeight: FONT_WEIGHTS.semiBold,
@@ -394,6 +437,36 @@ const styles = StyleSheet.create({
     color: COLORS.secondaryText,
     marginTop: 2,
     fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  welcomeCreditsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  welcomeCreditsLabel: {
+    fontSize: SIZES.text10,
+    color: COLORS.success,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  welcomeOfferBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.9)',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    marginHorizontal: SPACING.page,
+    marginTop: SPACING.md,
+    borderRadius: BORDER_RADIUS.button,
+    gap: SPACING.xs,
+  },
+  welcomeOfferText: {
+    fontSize: SIZES.text12,
+    color: COLORS.white,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    flex: 1,
+    textAlign: 'center',
   },
   upgradePrompt: {
     flexDirection: 'row',
