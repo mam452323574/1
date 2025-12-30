@@ -14,6 +14,7 @@ interface AuthContextType {
   session: Session | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  isEmailVerified: boolean;
   signIn: (email: string, password: string) => Promise<{ needsVerification: boolean; userId: string }>;
   signUp: (email: string, password: string) => Promise<{ userId: string; email: string }>;
   completeSignUp: (userId: string, username: string, avatarUrl?: string) => Promise<void>;
@@ -119,6 +120,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Erreur lors de la creation du compte');
     }
 
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .insert({
+        id: data.user.id,
+        email: data.user.email || email,
+        username: null,
+        avatar_url: null,
+        account_tier: 'free',
+        email_verified: false,
+      });
+
+    if (profileError) {
+      console.error('[SignUp] Error creating initial profile:', profileError);
+    }
+
     return { userId: data.user.id, email: data.user.email || email };
   };
 
@@ -134,34 +150,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const userEmail = user.email || `${userId}@oauth.temp`;
       const { error: profileError } = await supabase
         .from('user_profiles')
-        .insert({
-          id: userId,
-          email: userEmail,
+        .update({
           username,
           avatar_url: avatarUrl || null,
-          account_tier: 'free',
-          email_verified: false,
-        });
+        })
+        .eq('id', userId);
 
       if (profileError) {
         if (profileError.code === '23505') {
           throw new Error('Ce nom d\'utilisateur a ete pris. Veuillez en choisir un autre.');
         }
+        if (profileError.message?.includes('Email must be verified')) {
+          throw new Error('Veuillez verifier votre email avant de continuer.');
+        }
         throw profileError;
       }
 
-      await supabase.from('oauth_connections').insert({
+      const { error: oauthError } = await supabase.from('oauth_connections').insert({
         user_id: userId,
         provider: 'email',
         provider_user_id: userId,
         provider_email: user.email,
       });
 
+      if (oauthError && !oauthError.message?.includes('duplicate')) {
+        console.error('[SignUp] OAuth connection error:', oauthError);
+      }
+
       const today = new Date().toISOString().split('T')[0];
-      await supabase.from('health_scores').insert({
+      const { error: healthError } = await supabase.from('health_scores').insert({
         user_id: userId,
         score: 50,
         calories_current: 0,
@@ -171,9 +190,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         date: today,
       });
 
+      if (healthError && !healthError.message?.includes('duplicate')) {
+        console.error('[SignUp] Health score error:', healthError);
+      }
+
       await loadUserProfile(userId);
     } catch (profileError) {
-      console.error('[SignUp] Profile creation failed:', profileError);
+      console.error('[SignUp] Profile update failed:', profileError);
       throw profileError;
     }
   };
@@ -259,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: null,
           avatar_url: user.user_metadata?.avatar_url || null,
           account_tier: 'free',
+          email_verified: true,
         });
 
       if (profileError) {
@@ -575,12 +599,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isEmailVerified = userProfile?.email_verified ?? false;
+
   return (
     <AuthContext.Provider value={{
       user,
       session,
       userProfile,
       loading,
+      isEmailVerified,
       signIn,
       signUp,
       completeSignUp,

@@ -11,7 +11,7 @@ import { Button } from '@/components/Button';
 import { COLORS, SPACING, SIZES } from '@/constants/theme';
 
 function RootLayoutNav() {
-  const { user, userProfile, loading, signOut } = useAuth();
+  const { user, userProfile, loading, isEmailVerified, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const [redirectCount, setRedirectCount] = useState(0);
@@ -44,10 +44,10 @@ function RootLayoutNav() {
       setLoopDetected(true);
       Alert.alert(
         'Erreur de Navigation',
-        'Une boucle de redirection a été détectée. Cela peut indiquer un problème avec la configuration de votre profil. Veuillez vous déconnecter et réessayer.',
+        'Une boucle de redirection a ete detectee. Cela peut indiquer un probleme avec la configuration de votre profil. Veuillez vous deconnecter et reessayer.',
         [
           {
-            text: 'Se Déconnecter',
+            text: 'Se Deconnecter',
             style: 'destructive',
             onPress: async () => {
               setRedirectCount(0);
@@ -72,14 +72,20 @@ function RootLayoutNav() {
     if (!user && !inLogin && !inEmailVerification) {
       lastRedirectTime.current = now;
       router.replace('/login');
-    } else if (user && !userProfile?.username && !inUsernameSetup && !inEmailVerification) {
+    } else if (user && userProfile && !isEmailVerified && !inEmailVerification && !inLogin) {
+      lastRedirectTime.current = now;
+      router.replace({
+        pathname: '/email-verification',
+        params: { email: user.email || '', userId: user.id, type: 'signup' },
+      });
+    } else if (user && isEmailVerified && !userProfile?.username && !inUsernameSetup && !inEmailVerification) {
       lastRedirectTime.current = now;
       router.replace('/username-setup');
-    } else if (user && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin && !inEmailVerification) {
+    } else if (user && isEmailVerified && userProfile?.username && !inAuthGroup && !inUsernameSetup && !inPremiumUpgrade && !inLogin && !inEmailVerification) {
       lastRedirectTime.current = now;
       router.replace('/(tabs)');
     }
-  }, [user, userProfile, loading, segments, redirectCount]);
+  }, [user, userProfile, loading, isEmailVerified, segments, redirectCount]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

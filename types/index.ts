@@ -99,6 +99,7 @@ export interface UserProfile {
   account_tier: AccountTier;
   bio: string | null;
   push_token: string | null;
+  email_verified: boolean;
   notification_settings: {
     reminders: boolean;
     achievements: boolean;

@@ -13,7 +13,7 @@ const RESEND_COOLDOWN = 60;
 export default function EmailVerificationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string; userId?: string; type?: string; returnTo?: string }>();
-  const { sendVerificationEmail, verifyEmailCode, addTrustedDevice, user, signOut } = useAuth();
+  const { sendVerificationEmail, verifyEmailCode, addTrustedDevice, refreshUserProfile, user, signOut } = useAuth();
 
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
@@ -122,6 +122,8 @@ export default function EmailVerificationScreen() {
 
       if (isValid) {
         setSuccess(true);
+
+        await refreshUserProfile();
 
         if (rememberDevice && type === 'login') {
           try {

@@ -10,7 +10,7 @@ import { supabase } from '@/services/supabase';
 
 export default function UsernameSetupScreen() {
   const router = useRouter();
-  const { user, userProfile, checkUsernameAvailability, updateUserProfile, completeSignUp } = useAuth();
+  const { user, userProfile, isEmailVerified, checkUsernameAvailability, updateUserProfile, completeSignUp } = useAuth();
   const [username, setUsername] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function UsernameSetupScreen() {
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isNewSignup = !userProfile;
+  const isNewSignup = !userProfile?.username;
 
   useEffect(() => {
     if (!user) {
@@ -26,10 +26,18 @@ export default function UsernameSetupScreen() {
       return;
     }
 
+    if (!isEmailVerified) {
+      router.replace({
+        pathname: '/email-verification',
+        params: { email: user.email || '', userId: user.id, type: 'signup' },
+      });
+      return;
+    }
+
     if (user.user_metadata?.avatar_url) {
       setAvatarUrl(user.user_metadata.avatar_url);
     }
-  }, [user]);
+  }, [user, isEmailVerified]);
 
   useEffect(() => {
     if (checkTimeoutRef.current) {
@@ -81,6 +89,15 @@ export default function UsernameSetupScreen() {
       return;
     }
 
+    if (!isEmailVerified) {
+      setError('Veuillez verifier votre email avant de continuer.');
+      router.replace({
+        pathname: '/email-verification',
+        params: { email: user.email || '', userId: user.id, type: 'signup' },
+      });
+      return;
+    }
+
     if (!username) {
       setError('Veuillez choisir un nom d\'utilisateur');
       return;
@@ -95,9 +112,9 @@ export default function UsernameSetupScreen() {
       setLoading(true);
       setError(null);
 
-      if (isNewSignup) {
-        await completeSignUp(user.id, username, avatarUrl || undefined);
-      } else {
+      const isOAuthUser = user.app_metadata?.provider && user.app_metadata.provider !== 'email';
+
+      if (isOAuthUser) {
         await updateUserProfile({
           username,
           avatar_url: avatarUrl,
@@ -113,7 +130,7 @@ export default function UsernameSetupScreen() {
           metadata: user.user_metadata || {},
         });
 
-        if (oauthError && !oauthError.message.includes('duplicate')) {
+        if (oauthError && !oauthError.message?.includes('duplicate')) {
           console.error('[UsernameSetup] OAuth connection error:', oauthError);
         }
 
@@ -128,9 +145,11 @@ export default function UsernameSetupScreen() {
           date: today,
         });
 
-        if (healthError && !healthError.message.includes('duplicate')) {
+        if (healthError && !healthError.message?.includes('duplicate')) {
           console.error('[UsernameSetup] Health score error:', healthError);
         }
+      } else {
+        await completeSignUp(user.id, username, avatarUrl || undefined);
       }
 
       router.replace('/(tabs)');
@@ -138,6 +157,15 @@ export default function UsernameSetupScreen() {
       console.error('[UsernameSetup] Critical error during setup:', err);
 
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la configuration';
+
+      if (errorMessage.includes('Email must be verified') || errorMessage.includes('verifier votre email')) {
+        router.replace({
+          pathname: '/email-verification',
+          params: { email: user.email || '', userId: user.id, type: 'signup' },
+        });
+        return;
+      }
+
       setError(errorMessage);
 
       Alert.alert(
