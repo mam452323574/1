@@ -16,9 +16,19 @@ function RootLayoutNav() {
   const router = useRouter();
   const [redirectCount, setRedirectCount] = useState(0);
   const [loopDetected, setLoopDetected] = useState(false);
+  const [forceLogout, setForceLogout] = useState(false);
   const lastRedirectTime = useRef<number>(0);
 
   useEffect(() => {
+    if (forceLogout) {
+      console.log('[Navigation] Force logout triggered, redirecting to login');
+      setForceLogout(false);
+      setRedirectCount(0);
+      setLoopDetected(false);
+      router.replace('/login');
+      return;
+    }
+
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'recipes' || segments[0] === 'exercises' || segments[0] === 'scan-preview' || segments[0] === 'settings' || segments[0] === 'premium-plan' || segments[0] === 'privacy-policy' || segments[0] === 'notifications' || segments[0] === 'notification-settings';
@@ -39,7 +49,7 @@ function RootLayoutNav() {
       }
     }
 
-    if (redirectCount >= 5) {
+    if (redirectCount >= 5 && !loopDetected) {
       console.error('[Navigation] LOOP DETECTED - Too many redirects!');
       setLoopDetected(true);
       Alert.alert(
@@ -50,10 +60,14 @@ function RootLayoutNav() {
             text: 'Se Deconnecter',
             style: 'destructive',
             onPress: async () => {
-              setRedirectCount(0);
-              setLoopDetected(false);
-              await signOut();
-              router.replace('/login');
+              try {
+                console.log('[Navigation] Emergency logout initiated from loop detection');
+                await signOut();
+                setForceLogout(true);
+              } catch (error) {
+                console.error('[Navigation] Error during emergency logout:', error);
+                setForceLogout(true);
+              }
             },
           },
           {
@@ -85,7 +99,7 @@ function RootLayoutNav() {
       lastRedirectTime.current = now;
       router.replace('/(tabs)');
     }
-  }, [user, userProfile, loading, isEmailVerified, segments, redirectCount]);
+  }, [user, userProfile, loading, isEmailVerified, segments, redirectCount, forceLogout]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

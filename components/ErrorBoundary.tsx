@@ -1,6 +1,8 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, SIZES, SPACING, BORDER_RADIUS } from '@/constants/theme';
+import { supabase } from '@/services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Props {
   children: ReactNode;
@@ -39,6 +41,35 @@ export class ErrorBoundary extends Component<Props, State> {
     });
   };
 
+  handleLogout = async () => {
+    try {
+      console.log('[ErrorBoundary] Emergency logout initiated');
+
+      await AsyncStorage.multiRemove([
+        'supabase.auth.token',
+        '@supabase.auth.token',
+      ]);
+
+      await supabase.auth.signOut({ scope: 'local' });
+
+      this.setState({
+        hasError: false,
+        error: null,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    } catch (error) {
+      console.error('[ErrorBoundary] Error during emergency logout:', error);
+
+      this.setState({
+        hasError: false,
+        error: null,
+      });
+    }
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -55,12 +86,20 @@ export class ErrorBoundary extends Component<Props, State> {
                 </Text>
               </View>
             )}
-            <TouchableOpacity
-              style={styles.button}
-              onPress={this.handleReset}
-            >
-              <Text style={styles.buttonText}>Réessayer</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={this.handleReset}
+              >
+                <Text style={styles.buttonText}>Réessayer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.logoutButton]}
+                onPress={this.handleLogout}
+              >
+                <Text style={styles.buttonText}>Se Déconnecter</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       );
@@ -110,11 +149,22 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     fontFamily: 'monospace',
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    width: '100%',
+    justifyContent: 'center',
+  },
   button: {
     backgroundColor: COLORS.primary,
     borderRadius: BORDER_RADIUS.md,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
+    flex: 1,
+    alignItems: 'center',
+  },
+  logoutButton: {
+    backgroundColor: COLORS.error,
   },
   buttonText: {
     fontSize: SIZES.md,
