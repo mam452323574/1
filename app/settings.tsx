@@ -52,58 +52,61 @@ export default function SettingsScreen() {
     router.push('/notification-settings');
   };
 
+  const performSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      console.log('[Settings] Starting sign out...');
+
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+
+      await signOut();
+      console.log('[Settings] Sign out successful, redirecting to login...');
+      router.replace('/login');
+    } catch (error) {
+      console.error('[Settings] Sign out error:', error);
+      setIsSigningOut(false);
+      if (Platform.OS === 'web') {
+        alert('Une erreur est survenue lors de la deconnexion. Veuillez reessayer.');
+      } else {
+        Alert.alert(
+          'Erreur',
+          'Une erreur est survenue lors de la deconnexion. Veuillez reessayer.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  };
+
   const handleSignOut = async () => {
     if (isSigningOut) {
       return;
     }
 
-    try {
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
+    console.log('[Settings] handleSignOut called, Platform:', Platform.OS);
 
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(
+        'Etes-vous sur de vouloir vous deconnecter ?\n\nVos donnees seront sauvegardees et vous pourrez vous reconnecter a tout moment.'
+      );
+      if (confirmed) {
+        await performSignOut();
+      }
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       Alert.alert(
         'Deconnexion',
         'Etes-vous sur de vouloir vous deconnecter ?\n\nVos donnees seront sauvegardees et vous pourrez vous reconnecter a tout moment.',
         [
-          {
-            text: 'Annuler',
-            style: 'cancel',
-          },
+          { text: 'Annuler', style: 'cancel' },
           {
             text: 'Se Deconnecter',
             style: 'destructive',
-            onPress: async () => {
-              try {
-                setIsSigningOut(true);
-
-                if (Platform.OS !== 'web') {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                }
-
-                await signOut();
-                router.replace('/login');
-
-              } catch (error) {
-                console.error('[Settings] Sign out error:', error);
-                setIsSigningOut(false);
-                Alert.alert(
-                  'Erreur',
-                  'Une erreur est survenue lors de la deconnexion. Veuillez reessayer.',
-                  [
-                    {
-                      text: 'OK',
-                    },
-                  ]
-                );
-              }
-            },
+            onPress: performSignOut,
           },
         ]
       );
-    } catch (error) {
-      console.error('[Settings] Error in handleSignOut:', error);
-      setIsSigningOut(false);
     }
   };
 
