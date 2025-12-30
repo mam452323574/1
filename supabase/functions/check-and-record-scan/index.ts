@@ -21,6 +21,12 @@ interface ScanUsage {
   nutrition: ScanUsageRecord;
 }
 
+interface WelcomeCredits {
+  health: number;
+  body: number;
+  nutrition: number;
+}
+
 const SCAN_LIMITS = {
   free: {
     health: { count: 1, periodMs: 7 * 24 * 60 * 60 * 1000 },
@@ -81,7 +87,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile, error: profileError } = await supabaseClient
       .from('user_profiles')
-      .select('account_tier, scan_usage')
+      .select('account_tier, scan_usage, welcome_credits')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -95,9 +101,63 @@ Deno.serve(async (req: Request) => {
       body: { last_scan_date: null, scan_timestamps: [] },
       nutrition: { last_scan_date: null, scan_timestamps: [] },
     };
+    const welcomeCredits: WelcomeCredits = profile.welcome_credits || {
+      health: 0,
+      body: 0,
+      nutrition: 0,
+    };
+
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+
+    if (welcomeCredits[scanType] > 0) {
+      const updatedWelcomeCredits = {
+        ...welcomeCredits,
+        [scanType]: welcomeCredits[scanType] - 1,
+      };
+
+      const { error: updateCreditsError } = await supabaseClient
+        .from('user_profiles')
+        .update({ welcome_credits: updatedWelcomeCredits })
+        .eq('id', user.id);
+
+      if (updateCreditsError) {
+        throw updateCreditsError;
+      }
+
+      const { data: scanRecord, error: scanError } = await supabaseClient
+        .from('scans')
+        .insert({
+          user_id: user.id,
+          scan_type: scanType,
+          created_at: nowIso,
+        })
+        .select('id')
+        .single();
+
+      if (scanError) {
+        console.error('Error creating scan record:', scanError);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          allowed: true,
+          message: 'Scan autorise (credit de bienvenue utilise)',
+          used_welcome_credit: true,
+          remaining_welcome_credits: updatedWelcomeCredits[scanType],
+          scan_id: scanRecord?.id || null,
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
 
     const limit = SCAN_LIMITS[accountTier][scanType];
-    const now = Date.now();
     const cutoffTime = now - limit.periodMs;
 
     const record = scanUsage[scanType];
@@ -129,7 +189,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const nowIso = new Date(now).toISOString();
     validTimestamps.push(nowIso);
 
     const updatedScanUsage = {
